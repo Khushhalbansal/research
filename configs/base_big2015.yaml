@@ -54,7 +54,7 @@ split:
 optim:
   lr: 0.0003
   weight_decay: 0.0001
-  epochs: 20
+  epochs: 15
   warmup_epochs: 2
   grad_accumulation_steps: 1
   checkpoint_every_n_epochs: 5

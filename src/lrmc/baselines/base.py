@@ -31,6 +31,12 @@ class BaselineDetector:
     def predict(self, x: torch.Tensor) -> str:
         raise NotImplementedError
 
+    def nearest_family(self, x: torch.Tensor) -> str:
+        """Forced closed-set prediction (family only, ignoring the accept/
+        reject threshold) -- used for closed-set metrics and OSCR's
+        known_correct, which need a family guess independent of kappa."""
+        raise NotImplementedError
+
     def calibrate(self, val_loader, target_known_tpr: float = 0.95) -> None:
         """Default: threshold = the target_known_tpr quantile of KNOWN-val
         scores (so that quantile-fraction of known val samples are accepted).
@@ -111,6 +117,11 @@ class PerClassStatBaseline(EmbeddingBaseline):
         z, _y = self._embed_loader(val_loader)
         scores = np.array([self._score_embedding(zi) for zi in z.numpy()])
         self.kappa = float(np.quantile(scores, target_known_tpr))
+
+    def nearest_family(self, x: torch.Tensor) -> str:
+        z = self._embed_one(x)
+        stat = self._per_class_stat(z)
+        return self.families[int(np.nanargmin(stat))]
 
 
 def majority_vote(labels: np.ndarray) -> int:

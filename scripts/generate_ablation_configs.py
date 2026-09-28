@@ -65,11 +65,20 @@ ABLATIONS: dict[str, tuple[dict, str]] = {
 }
 
 
+# Ablations exist to show a qualitative effect, not to reproduce the main
+# result's full training budget -- running all 23 at the main run's 20 epochs
+# would blow well past Kaggle's 30 GPU-hours/week quota (see
+# docs/DECISIONS.md and experiments/queue.yaml). 15 epochs is documented here
+# as the deliberate, shared reduction for every Tier-B ablation.
+ABLATION_EPOCHS = 15
+
+
 def main() -> None:
     base = load_config(BASE_CONFIG_PATH)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for name, (overrides, _rationale) in ABLATIONS.items():
-        cfg = merge_overrides(base, overrides)
+        full_overrides = {"optim.epochs": ABLATION_EPOCHS, **overrides}
+        cfg = merge_overrides(base, full_overrides)
         cfg.run_name = f"ablation_{name}"
         cfg.output_dir = f"runs/ablation_{name}"
         out_path = OUT_DIR / f"{name}.yaml"

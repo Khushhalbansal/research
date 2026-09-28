@@ -51,3 +51,7 @@ class SoftmaxMSPBaseline(BaselineDetector):
         if self.kappa is not None and score > self.kappa:
             return UNKNOWN_LABEL
         return self.families[best]
+
+    def nearest_family(self, x: torch.Tensor) -> str:
+        probs = self._probs(x)
+        return self.families[int(probs.argmax().item())]

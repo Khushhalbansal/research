@@ -108,3 +108,8 @@ class DeepSVDDBaseline(BaselineDetector):
             return UNKNOWN_LABEL
         dists = np.linalg.norm(self.family_centroids - z, axis=1)
         return self.families[int(dists.argmin())]
+
+    def nearest_family(self, x: torch.Tensor) -> str:
+        _d, z = self._distance(x)
+        dists = np.linalg.norm(self.family_centroids - z, axis=1)
+        return self.families[int(dists.argmin())]

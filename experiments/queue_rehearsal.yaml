@@ -1,0 +1,53 @@
+# CPU rehearsal queue: mock data, tiny_test preset. `make rehearsal` runs
+# this end-to-end today to prove the queue runner itself (resumability,
+# skip-completed, dependency handling, budget stop) works before tomorrow's
+# real GPU run uses experiments/queue.yaml. Every metrics.json this produces
+# carries is_synthetic: true and is excluded by `aggregate`.
+session_budget_minutes: 30
+
+tiers:
+  A:
+    description: "Rehearsal: mock Malimg LRMC main run + one network baseline + embedding baselines."
+    jobs:
+      - name: rehearsal_malimg_main_lrmc
+        type: train_lrmc
+        config: configs/rehearsal_mock_malimg.yaml
+        estimated_gpu_minutes: 1
+
+      - name: rehearsal_malimg_baseline_softmax_msp
+        type: baseline_network
+        config: configs/rehearsal_mock_malimg.yaml
+        baseline: softmax_msp
+        params: { epochs: 2 }
+        estimated_gpu_minutes: 1
+
+      - name: rehearsal_malimg_baseline_prototype_cosine
+        type: baseline_embedding
+        config: configs/rehearsal_mock_malimg.yaml
+        baseline: prototype_cosine
+        depends_on: rehearsal_malimg_main_lrmc
+        estimated_gpu_minutes: 1
+
+      - name: rehearsal_malimg_baseline_fixed_radius_prototype
+        type: baseline_embedding
+        config: configs/rehearsal_mock_malimg.yaml
+        baseline: fixed_radius_prototype
+        depends_on: rehearsal_malimg_main_lrmc
+        params: { quantile: 0.9 }
+        estimated_gpu_minutes: 1
+
+  B:
+    description: "Rehearsal: one mock ablation."
+    jobs:
+      - name: rehearsal_ablation_no_l_rad
+        type: train_lrmc
+        config: configs/rehearsal_mock_malimg.yaml
+        estimated_gpu_minutes: 1
+
+  C:
+    description: "Rehearsal: mock BIG2015 LRMC main run."
+    jobs:
+      - name: rehearsal_big2015_main_lrmc
+        type: train_lrmc
+        config: configs/rehearsal_mock_big2015.yaml
+        estimated_gpu_minutes: 1

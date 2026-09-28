@@ -97,6 +97,7 @@ class SplitConfig:
     pseudo_unknown_family: str | None = None
     group_aware: bool = False
     groups_file: str | None = None
+    fold_index: int = 0  # which fold to use when protocol == "leave_one_family_out"
 
 
 @dataclass

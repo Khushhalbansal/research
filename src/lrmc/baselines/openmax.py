@@ -132,3 +132,7 @@ class OpenMaxBaseline(BaselineDetector):
         if threshold is not None and probs[-1] > threshold:
             return UNKNOWN_LABEL
         return self.families[best]
+
+    def nearest_family(self, x: torch.Tensor) -> str:
+        logits, _feat = self._forward(x)
+        return self.families[int(np.argmax(logits))]

@@ -61,3 +61,7 @@ class EnergyBaseline(BaselineDetector):
         if self.kappa is not None and energy > self.kappa:
             return UNKNOWN_LABEL
         return self.families[best]
+
+    def nearest_family(self, x: torch.Tensor) -> str:
+        logits = self._logits(x)
+        return self.families[int(logits.argmax().item())]

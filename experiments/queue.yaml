@@ -1,0 +1,220 @@
+# Prioritized job queue for tomorrow's Kaggle run. `lrmc run-queue` executes
+# tiers in order (A -> B -> C), each tier's jobs in list order, skips any job
+# whose runs/<name>/metrics.json already exists, and STOPS (not skips) as
+# soon as the remaining session budget can't cover the next job's
+# estimated_gpu_minutes -- so priority order is preserved across sessions.
+#
+# estimated_gpu_minutes are HONEST EXTRAPOLATIONS, not measurements: derived
+# from an actual measured CPU forward+backward step with the tiny_test
+# preset (src/lrmc/orchestration/budget.py), scaled by the MEASURED approx-
+# FLOPs ratio between tiny_test and the real backbone, divided by an assumed
+# 10x CPU->T4 speedup (conservative; see docs/DECISIONS.md). Re-run
+# `python scripts/estimate_queue_budget.py` to refresh these after any
+# architecture/epoch-count change.
+#
+# Kaggle: ~30 GPU-hours/week, 12-hour sessions. Tier A (~640 min / ~10.7h) is
+# sized to fit in ONE session. Tier B (23 ablations, ~2840 min / ~47h) will
+# span multiple weekly quotas by design -- that's why the runner is resumable
+# and skip-completed. Tier C is a third session's worth.
+session_budget_minutes: 660 # 11h, leaving a safety margin under Kaggle's 12h cap
+
+tiers:
+  A:
+    description: >
+      Minimum publishable set: Malimg main LRMC result, the four baselines
+      that need their own trained network (softmax MSP, energy, OpenMax,
+      Deep SVDD), and the five embedding-based baselines reusing the SAME
+      trained LRMC encoder (prototype-cosine, fixed-radius-prototype --the
+      key learnable-vs-fixed-radii ablation--, Mahalanobis, kNN, OCSVM).
+    jobs:
+      - name: malimg_main_lrmc
+        type: train_lrmc
+        config: configs/base_malimg.yaml
+        estimated_gpu_minutes: 160
+
+      - name: malimg_baseline_softmax_msp
+        type: baseline_network
+        config: configs/base_malimg.yaml
+        baseline: softmax_msp
+        params: { epochs: 15 }
+        estimated_gpu_minutes: 120
+
+      - name: malimg_baseline_energy
+        type: baseline_network
+        config: configs/base_malimg.yaml
+        baseline: energy
+        params: { epochs: 15 }
+        estimated_gpu_minutes: 120
+
+      - name: malimg_baseline_openmax
+        type: baseline_network
+        config: configs/base_malimg.yaml
+        baseline: openmax
+        params: { epochs: 15, tail_size: 20 }
+        estimated_gpu_minutes: 120
+
+      - name: malimg_baseline_deep_svdd
+        type: baseline_network
+        config: configs/base_malimg.yaml
+        baseline: deep_svdd
+        params: { epochs: 15, feature_dim: 128 }
+        estimated_gpu_minutes: 120
+
+      - name: malimg_baseline_prototype_cosine
+        type: baseline_embedding
+        config: configs/base_malimg.yaml
+        baseline: prototype_cosine
+        depends_on: malimg_main_lrmc
+        estimated_gpu_minutes: 3
+
+      - name: malimg_baseline_fixed_radius_prototype
+        type: baseline_embedding
+        config: configs/base_malimg.yaml
+        baseline: fixed_radius_prototype
+        depends_on: malimg_main_lrmc
+        params: { quantile: 0.9 }
+        estimated_gpu_minutes: 3
+
+      - name: malimg_baseline_mahalanobis
+        type: baseline_embedding
+        config: configs/base_malimg.yaml
+        baseline: mahalanobis
+        depends_on: malimg_main_lrmc
+        estimated_gpu_minutes: 3
+
+      - name: malimg_baseline_knn
+        type: baseline_embedding
+        config: configs/base_malimg.yaml
+        baseline: knn
+        depends_on: malimg_main_lrmc
+        params: { k: 5 }
+        estimated_gpu_minutes: 3
+
+      - name: malimg_baseline_ocsvm
+        type: baseline_embedding
+        config: configs/base_malimg.yaml
+        baseline: ocsvm
+        depends_on: malimg_main_lrmc
+        params: { nu: 0.05 }
+        estimated_gpu_minutes: 3
+
+  B:
+    description: >
+      Full ablation sweep (23 configs under configs/ablation/, each 15
+      epochs). Expected to span multiple weekly GPU-hour quotas -- run in
+      priority order across as many sessions as it takes; already-completed
+      ablations are skipped automatically.
+    jobs:
+      - name: ablation_no_l_in
+        type: train_lrmc
+        config: configs/ablation/no_l_in.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_no_l_out
+        type: train_lrmc
+        config: configs/ablation/no_l_out.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_no_l_rad
+        type: train_lrmc
+        config: configs/ablation/no_l_rad.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_gamma_0.05
+        type: train_lrmc
+        config: configs/ablation/gamma_0.05.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_gamma_0.2
+        type: train_lrmc
+        config: configs/ablation/gamma_0.2.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_gamma_0.3
+        type: train_lrmc
+        config: configs/ablation/gamma_0.3.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_gamma_0.5
+        type: train_lrmc
+        config: configs/ablation/gamma_0.5.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_split_naive_holdout
+        type: train_lrmc
+        config: configs/ablation/split_naive_holdout.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_prototypes_batch_mean
+        type: train_lrmc
+        config: configs/ablation/prototypes_batch_mean.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_distance_euclidean
+        type: train_lrmc
+        config: configs/ablation/distance_euclidean.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_temperature_0.05
+        type: train_lrmc
+        config: configs/ablation/temperature_0.05.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_temperature_0.2
+        type: train_lrmc
+        config: configs/ablation/temperature_0.2.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_temperature_0.5
+        type: train_lrmc
+        config: configs/ablation/temperature_0.5.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_margin_0.05
+        type: train_lrmc
+        config: configs/ablation/margin_0.05.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_margin_0.2
+        type: train_lrmc
+        config: configs/ablation/margin_0.2.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_margin_0.3
+        type: train_lrmc
+        config: configs/ablation/margin_0.3.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_embed_dim_64
+        type: train_lrmc
+        config: configs/ablation/embed_dim_64.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_embed_dim_256
+        type: train_lrmc
+        config: configs/ablation/embed_dim_256.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_backbone_scratch
+        type: train_lrmc
+        config: configs/ablation/backbone_scratch.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_n_unknown_1
+        type: train_lrmc
+        config: configs/ablation/n_unknown_1.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_n_unknown_5
+        type: train_lrmc
+        config: configs/ablation/n_unknown_5.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_n_unknown_8
+        type: train_lrmc
+        config: configs/ablation/n_unknown_8.yaml
+        estimated_gpu_minutes: 120
+      - name: ablation_backbone_resnet18
+        type: train_lrmc
+        config: configs/ablation/backbone_resnet18.yaml
+        estimated_gpu_minutes: 203
+
+  C:
+    description: "BIG 2015 + extras."
+    jobs:
+      - name: big2015_main_lrmc
+        type: train_lrmc
+        config: configs/base_big2015.yaml
+        estimated_gpu_minutes: 140
+      - name: big2015_baseline_softmax_msp
+        type: baseline_network
+        config: configs/base_big2015.yaml
+        baseline: softmax_msp
+        params: { epochs: 15 }
+        estimated_gpu_minutes: 105
+      - name: big2015_baseline_fixed_radius_prototype
+        type: baseline_embedding
+        config: configs/base_big2015.yaml
+        baseline: fixed_radius_prototype
+        depends_on: big2015_main_lrmc
+        params: { quantile: 0.9 }
+        estimated_gpu_minutes: 3

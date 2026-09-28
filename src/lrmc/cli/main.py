@@ -1,0 +1,204 @@
+"""CLI entry points: train, evaluate, infer, scan, run-queue, aggregate.
+
+Usage: ``lrmc <command> [args]`` (installed via pyproject.toml's
+``[project.scripts]``) or ``python -m lrmc.cli.main <command> [args]``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import sys
+from pathlib import Path
+
+from lrmc.config import load_config, merge_overrides
+from lrmc.data.factory import build_fold, build_loader
+from lrmc.data.image_generator import ImageGenerator
+from lrmc.engine.alert import AlertGenerator
+from lrmc.engine.infer import FrozenInferenceEngine
+from lrmc.engine.scan import Scanner
+from lrmc.engine.train import Trainer
+from lrmc.eval.evaluate import run_evaluation, write_metrics_json
+from lrmc.orchestration.queue import QueueRunner
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("lrmc.cli")
+
+
+def _parse_overrides(pairs: list[str]) -> dict:
+    overrides = {}
+    for pair in pairs:
+        if "=" not in pair:
+            raise SystemExit(f"--override expects key=value, got '{pair}'")
+        key, value = pair.split("=", 1)
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            pass  # keep as plain string
+        overrides[key] = value
+    return overrides
+
+
+def _load_cfg(args) -> object:
+    cfg = load_config(args.config)
+    if getattr(args, "override", None):
+        cfg = merge_overrides(cfg, _parse_overrides(args.override))
+    return cfg
+
+
+def cmd_train(args) -> None:
+    cfg = _load_cfg(args)
+    loader = build_loader(cfg)
+    fold = build_fold(cfg, loader)
+    trainer = Trainer(cfg, loader, fold)
+    metrics = trainer.fit()
+    out_dir = Path(cfg.output_dir)
+    write_metrics_json(metrics, out_dir / "train_metrics.json")
+    fold.to_json(out_dir / "fold.json")
+    logger.info("Training complete. Checkpoint: %s", trainer.checkpoint_path)
+
+
+def cmd_evaluate(args) -> None:
+    cfg = _load_cfg(args)
+    loader = build_loader(cfg)
+    fold = build_fold(cfg, loader)
+    checkpoint_path = args.checkpoint or str(Path(cfg.output_dir) / "checkpoint.pt")
+    metrics = run_evaluation(cfg, loader, fold, checkpoint_path)
+    out_path = Path(args.output) if args.output else Path(cfg.output_dir) / "metrics.json"
+    write_metrics_json(metrics, out_path)
+    logger.info("Evaluation complete. Wrote %s", out_path)
+    print(json.dumps({"closed_set_accuracy": metrics["closed_set"]["accuracy"], "auroc": metrics["open_set"].get("auroc")}, indent=2))
+
+
+def cmd_infer(args) -> None:
+    cfg = _load_cfg(args)
+    checkpoint_path = args.checkpoint or str(Path(cfg.output_dir) / "checkpoint.pt")
+    engine = FrozenInferenceEngine(cfg, checkpoint_path)
+    gen = ImageGenerator(image_size=cfg.data.image_size)
+
+    from lrmc.data.preprocessor import FilePreprocessor
+
+    pre = FilePreprocessor()
+    if args.input.endswith(".bytes"):
+        result = pre.load_bytes_file(args.input)
+        image = gen.eval_view(result.byte_stream, is_pre_rendered_image=False)
+    else:
+        result = pre.load_image_array(args.input)
+        image = gen.eval_view(result.byte_stream, is_pre_rendered_image=True)
+
+    out = engine.predict(image)
+    print(
+        json.dumps(
+            {
+                "sha256": result.sha256,
+                "verdict": out.verdict,
+                "nearest_family": out.nearest_family,
+                "score": out.score,
+            },
+            indent=2,
+        )
+    )
+
+
+def cmd_scan(args) -> None:
+    cfg = _load_cfg(args)
+    checkpoint_path = args.checkpoint or str(Path(cfg.output_dir) / "checkpoint.pt")
+    engine = FrozenInferenceEngine(cfg, checkpoint_path)
+    gen = ImageGenerator(image_size=cfg.data.image_size)
+    alert_gen = AlertGenerator(args.alerts_out)
+    scanner = Scanner(engine, gen, alert_gen)
+
+    paths = [args.path] if Path(args.path).is_file() else list(Path(args.path).rglob("*"))
+    paths = [p for p in paths if Path(p).is_file()]
+    for p in paths:
+        alert = scanner.scan_file(p)
+        logger.info("%s -> %s (%s)", p, alert.verdict, alert.nearest_family)
+    logger.info("Scanned %d file(s). Alerts written to %s", len(paths), args.alerts_out)
+
+
+def cmd_run_queue(args) -> None:
+    runner = QueueRunner(args.queue, session_budget_minutes=args.budget_minutes, dry_run=args.dry_run)
+    results = runner.run()
+    for r in results:
+        logger.info("[%s] %s: %s", r.tier, r.name, r.status)
+    n_completed = sum(1 for r in results if r.status == "completed")
+    n_failed = sum(1 for r in results if r.status == "failed")
+    logger.info("Queue run finished: %d completed, %d failed, %d total", n_completed, n_failed, len(results))
+
+
+def cmd_aggregate(args) -> None:
+    from lrmc.aggregate.collect import collect_runs
+    from lrmc.aggregate.facts import write_paper_facts
+    from lrmc.aggregate.figures import generate_all_figures
+    from lrmc.aggregate.summary import write_results_summary
+    from lrmc.aggregate.tables import generate_all_tables
+
+    runs = collect_runs(args.runs_dir)
+    logger.info(
+        "Collected %d run(s): %d real, %d synthetic (excluded from tables/figures)",
+        len(runs),
+        sum(1 for r in runs if not r["is_synthetic"]),
+        sum(1 for r in runs if r["is_synthetic"]),
+    )
+    out_dir = Path(args.output_dir)
+    generate_all_tables(runs, out_dir / "tables")
+    generate_all_figures(runs, out_dir / "figures")
+    write_paper_facts(runs, out_dir / "paper_facts.json")
+    write_results_summary(runs, out_dir / "results_summary.md")
+    logger.info("Paper artifacts written to %s", out_dir)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="lrmc")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_train = sub.add_parser("train", help="Train an LRMC model from a config")
+    p_train.add_argument("config")
+    p_train.add_argument("--override", action="append", default=[], help="key=value dotted override")
+    p_train.set_defaults(func=cmd_train)
+
+    p_eval = sub.add_parser("evaluate", help="Evaluate a trained checkpoint")
+    p_eval.add_argument("config")
+    p_eval.add_argument("--checkpoint", default=None)
+    p_eval.add_argument("--output", default=None)
+    p_eval.add_argument("--override", action="append", default=[])
+    p_eval.set_defaults(func=cmd_evaluate)
+
+    p_infer = sub.add_parser("infer", help="Run frozen inference on a single file")
+    p_infer.add_argument("config")
+    p_infer.add_argument("input")
+    p_infer.add_argument("--checkpoint", default=None)
+    p_infer.add_argument("--override", action="append", default=[])
+    p_infer.set_defaults(func=cmd_infer)
+
+    p_scan = sub.add_parser("scan", help="Scan a raw executable (or directory) and emit JSONL alerts")
+    p_scan.add_argument("config")
+    p_scan.add_argument("path")
+    p_scan.add_argument("--checkpoint", default=None)
+    p_scan.add_argument("--alerts-out", default="alerts.jsonl")
+    p_scan.add_argument("--override", action="append", default=[])
+    p_scan.set_defaults(func=cmd_scan)
+
+    p_queue = sub.add_parser("run-queue", help="Execute a prioritized job queue")
+    p_queue.add_argument("queue", nargs="?", default="experiments/queue.yaml")
+    p_queue.add_argument("--budget-minutes", type=float, default=None)
+    p_queue.add_argument("--dry-run", action="store_true")
+    p_queue.set_defaults(func=cmd_run_queue)
+
+    p_agg = sub.add_parser("aggregate", help="Build paper_artifacts/ from runs/")
+    p_agg.add_argument("--runs-dir", default="runs")
+    p_agg.add_argument("--output-dir", default="paper_artifacts")
+    p_agg.set_defaults(func=cmd_aggregate)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -43,3 +43,9 @@ class OCSVMBaseline(EmbeddingBaseline):
         # OCSVM's boundary is already fixed by nu at fit() time; nothing to
         # calibrate on val data, kept as a documented no-op for interface parity.
         return None
+
+    def nearest_family(self, x) -> str:
+        z = self._embed_one(x)
+        zn = z / np.linalg.norm(z)
+        d = 1.0 - self.prototypes @ zn
+        return self.families[int(d.argmin())]

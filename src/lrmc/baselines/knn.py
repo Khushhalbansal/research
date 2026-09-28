@@ -43,3 +43,8 @@ class KNNBaseline(EmbeddingBaseline):
         z, _y = self._embed_loader(val_loader)
         scores = np.array([self._score_embedding(zi) for zi in z.numpy()])
         self.kappa = float(np.quantile(scores, target_known_tpr))
+
+    def nearest_family(self, x) -> str:
+        z = self._embed_one(x)
+        _d, idx = self._neighbors(z)
+        return self.families[majority_vote(self.train_y[idx])]
