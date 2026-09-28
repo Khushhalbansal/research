@@ -106,9 +106,9 @@ def generate_mock_big2015(
         n_written = 0
         for i in range(n_per_family):
             n_bytes = int(rng.integers(min_bytes, max_bytes))
-            values = np.clip(
-                base_val + rng.integers(-20, 20, size=n_bytes), 0, 255
-            ).astype(np.uint8)
+            values = np.clip(base_val + rng.integers(-20, 20, size=n_bytes), 0, 255).astype(
+                np.uint8
+            )
             sample_id = hashlib.md5(f"{family}_{i}_{seed}".encode()).hexdigest()[:12]
             fpath = root / "train" / f"{sample_id}.bytes"
             _write_bytes_file(fpath, values, unknown_byte_frac, rng)

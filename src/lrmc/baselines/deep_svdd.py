@@ -66,7 +66,7 @@ class DeepSVDDBaseline(BaselineDetector):
         self.backbone.train()
         self.proj.train()
         for _epoch in range(self.epochs):
-            for images, labels, _ids in train_loader:
+            for images, _labels, _ids in train_loader:
                 optimizer.zero_grad()
                 z = self._forward(images.to(self.device))
                 loss = ((z - self.center) ** 2).sum(dim=1).mean()

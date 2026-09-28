@@ -24,13 +24,19 @@ ABLATIONS: dict[str, tuple[dict, str]] = {
     # (a) remove each loss term
     "no_l_in": ({"loss.alpha": 0.0}, "drop compactness term L_in (alpha=0)"),
     "no_l_out": ({"loss.beta": 0.0}, "drop separation term L_out (beta=0)"),
-    "no_l_rad": ({"loss.gamma": 0.0}, "drop tightness term L_rad (gamma=0); radii then grow unchecked"),
+    "no_l_rad": (
+        {"loss.gamma": 0.0},
+        "drop tightness term L_rad (gamma=0); radii then grow unchecked",
+    ),
     # (b) learnable vs fixed radii is the LRMC-vs-FixedRadiusPrototypeBaseline
     # comparison (see baselines/fixed_radius_prototype.py), not a Config field.
     # (c) EMA vs batch-mean prototypes
     "prototypes_batch_mean": ({"prototypes.mode": "batch_mean"}, "no cross-batch prototype memory"),
     # (d) cosine vs Euclidean distance
-    "distance_euclidean": ({"loss.distance_metric": "euclidean"}, "squared-Euclidean instead of cosine distance"),
+    "distance_euclidean": (
+        {"loss.distance_metric": "euclidean"},
+        "squared-Euclidean instead of cosine distance",
+    ),
     # (e) temperature sweep
     "temperature_0.05": ({"loss.temperature": 0.05}, "sharper SupCon temperature"),
     "temperature_0.2": ({"loss.temperature": 0.2}, "softer SupCon temperature"),

@@ -36,7 +36,9 @@ def approx_flops(model: nn.Module, input_tensor: torch.Tensor) -> int:
 
     def conv_hook(module: nn.Conv2d, inp, out):
         out_h, out_w = out.shape[-2], out.shape[-1]
-        kernel_ops = module.kernel_size[0] * module.kernel_size[1] * (module.in_channels // module.groups)
+        kernel_ops = (
+            module.kernel_size[0] * module.kernel_size[1] * (module.in_channels // module.groups)
+        )
         flop_total["value"] += 2 * out.shape[0] * out_h * out_w * module.out_channels * kernel_ops
 
     for m in model.modules():

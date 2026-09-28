@@ -31,7 +31,9 @@ class Scanner:
 
     def scan_file(self, path: str | Path) -> Alert:
         pre = self.preprocessor.load_raw_executable(path)
-        pe_check = self.preprocessor.pe_header_sanity_check(pre.byte_stream)  # fail-soft, informational
+        pe_check = self.preprocessor.pe_header_sanity_check(
+            pre.byte_stream
+        )  # fail-soft, informational
         image = self.image_gen.eval_view(pre.byte_stream, is_pre_rendered_image=False)
         result = self.engine.predict(image)
         alert = self.alert_gen.make_alert(

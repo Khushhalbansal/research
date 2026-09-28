@@ -64,3 +64,41 @@ One-line-rationale record of choices made under ambiguity, per the mission's pri
   CPU numbers, not GPU estimates — `experiments/queue.yaml` GPU-minute estimates are
   a *separate*, explicitly-labelled extrapolation (`estimated: true`) from CPU
   tiny_test throughput, never conflated with a measured run.
+- **OSCR curve** follows the standard formulation (correct-classification rate on
+  knowns vs. false-positive rate on unknowns, swept over the accept/reject
+  threshold, AUC via trapezoidal integration) used across the open-set-recognition
+  literature (Dhamija et al. 2018 and follow-ups); not the original 2000s OSCR
+  paper's exact variant, since that one predates modern deep open-set benchmarks
+  and the community has converged on this formulation.
+- **OpenMax simplifications** (documented again here since they affect reported
+  numbers): distance-to-mean-activation-vector uses cosine distance only (paper
+  uses a Euclidean+cosine hybrid); no rank-based alpha-weighting of the Weibull
+  revision scores. Both preserve the core recalibration mechanism the baseline
+  exists to represent; see `baselines/openmax.py` docstring for the full algorithm
+  citation.
+- **Deep SVDD baseline shares the same `ViTBackbone` class as LRMC** (fair
+  comparison, same preprocessing) rather than the original paper's bias-free,
+  bounded-activation architecture that specifically blocks representation
+  collapse. This is a real, documented risk — if a Deep SVDD run shows near-zero
+  embedding variance, that is this simplification biting, not a bug to chase.
+  Flagged again in HANDOFF.md's risk list.
+- **t-SNE, not UMAP, for the embedding-projection figure** — scikit-learn's t-SNE
+  is already a project dependency; adding `umap-learn` only for one figure isn't
+  worth the extra install surface on a possibly-offline Kaggle session. Swap it in
+  post-hoc if preferred; the figure code isolates the projection call to one line.
+- **Radius-coverage figure draws 2D circles from a PCA projection** and says so in
+  its own title — the true acceptance region is a cap on a high-dimensional
+  hypersphere, not a disk in any 2D projection, so this figure is explicitly
+  qualitative, never used as a source of quantitative claims.
+- **Ablation epoch budget (15) is deliberately lower than the main run's (20)** —
+  running all 23 ablations at the main run's budget would cost an estimated ~47
+  GPU-hours (measured/extrapolated via `scripts/estimate_queue_budget.py`),
+  exceeding Kaggle's 30 GPU-hours/week quota more than once over; ablations exist
+  to show a qualitative direction of effect, not to match the main result's
+  statistical power. See `experiments/queue.yaml`'s header comment for the numbers.
+- **`run_baseline_evaluation` needs a `nearest_family(x)` method beyond the
+  mission's literal fit/score/predict interface** — closed-set metrics and OSCR's
+  `known_correct` need a family guess independent of the accept/reject threshold,
+  which `predict(x)` alone can't provide once it returns `"UNKNOWN"`. Added as an
+  extra method on every baseline (never a replacement for the required three), so
+  the required interface still holds exactly as specified.

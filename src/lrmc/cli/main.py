@@ -68,7 +68,15 @@ def cmd_evaluate(args) -> None:
     out_path = Path(args.output) if args.output else Path(cfg.output_dir) / "metrics.json"
     write_metrics_json(metrics, out_path)
     logger.info("Evaluation complete. Wrote %s", out_path)
-    print(json.dumps({"closed_set_accuracy": metrics["closed_set"]["accuracy"], "auroc": metrics["open_set"].get("auroc")}, indent=2))
+    print(
+        json.dumps(
+            {
+                "closed_set_accuracy": metrics["closed_set"]["accuracy"],
+                "auroc": metrics["open_set"].get("auroc"),
+            },
+            indent=2,
+        )
+    )
 
 
 def cmd_infer(args) -> None:
@@ -118,13 +126,17 @@ def cmd_scan(args) -> None:
 
 
 def cmd_run_queue(args) -> None:
-    runner = QueueRunner(args.queue, session_budget_minutes=args.budget_minutes, dry_run=args.dry_run)
+    runner = QueueRunner(
+        args.queue, session_budget_minutes=args.budget_minutes, dry_run=args.dry_run
+    )
     results = runner.run()
     for r in results:
         logger.info("[%s] %s: %s", r.tier, r.name, r.status)
     n_completed = sum(1 for r in results if r.status == "completed")
     n_failed = sum(1 for r in results if r.status == "failed")
-    logger.info("Queue run finished: %d completed, %d failed, %d total", n_completed, n_failed, len(results))
+    logger.info(
+        "Queue run finished: %d completed, %d failed, %d total", n_completed, n_failed, len(results)
+    )
 
 
 def cmd_aggregate(args) -> None:
@@ -155,7 +167,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_train = sub.add_parser("train", help="Train an LRMC model from a config")
     p_train.add_argument("config")
-    p_train.add_argument("--override", action="append", default=[], help="key=value dotted override")
+    p_train.add_argument(
+        "--override", action="append", default=[], help="key=value dotted override"
+    )
     p_train.set_defaults(func=cmd_train)
 
     p_eval = sub.add_parser("evaluate", help="Evaluate a trained checkpoint")
@@ -172,7 +186,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_infer.add_argument("--override", action="append", default=[])
     p_infer.set_defaults(func=cmd_infer)
 
-    p_scan = sub.add_parser("scan", help="Scan a raw executable (or directory) and emit JSONL alerts")
+    p_scan = sub.add_parser(
+        "scan", help="Scan a raw executable (or directory) and emit JSONL alerts"
+    )
     p_scan.add_argument("config")
     p_scan.add_argument("path")
     p_scan.add_argument("--checkpoint", default=None)

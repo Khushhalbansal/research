@@ -49,17 +49,25 @@ class Trainer:
 
         self.label_map = build_label_map(loader.records, fold.known_families)
         self.num_classes = len(self.label_map)
-        self.image_gen = ImageGenerator(image_size=cfg.data.image_size, augmentation=cfg.data.augmentation)
+        self.image_gen = ImageGenerator(
+            image_size=cfg.data.image_size, augmentation=cfg.data.augmentation
+        )
 
         self.network = FeatureExtractionNetwork(cfg.backbone, cfg.projection_head)
         self.prototypes = ClassPrototypeEstimator(
-            self.num_classes, cfg.projection_head.out_dim, mode=cfg.prototypes.mode,
+            self.num_classes,
+            cfg.projection_head.out_dim,
+            mode=cfg.prototypes.mode,
             momentum=cfg.prototypes.momentum,
         )
         self.radii = LearnableRadiiParameters(self.num_classes, r_init=cfg.radius.r_init)
         self.loss_calc = LRMCLossCalculator(
-            temperature=cfg.loss.temperature, alpha=cfg.loss.alpha, beta=cfg.loss.beta,
-            gamma=cfg.loss.gamma, margin=cfg.loss.margin, distance_metric=cfg.loss.distance_metric,
+            temperature=cfg.loss.temperature,
+            alpha=cfg.loss.alpha,
+            beta=cfg.loss.beta,
+            gamma=cfg.loss.gamma,
+            margin=cfg.loss.margin,
+            distance_metric=cfg.loss.distance_metric,
         )
 
         self.device = torch.device(
@@ -99,7 +107,9 @@ class Trainer:
         self.start_epoch = 0
         self.history: list[dict] = []
 
-        self.train_dataset = ContrastiveMalwareDataset(loader, fold.train, self.image_gen, self.label_map)
+        self.train_dataset = ContrastiveMalwareDataset(
+            loader, fold.train, self.image_gen, self.label_map
+        )
         sampler = None
         if cfg.data.class_balanced_sampling:
             sampler = class_balanced_sampler(loader, fold.train, self.label_map)
@@ -204,7 +214,8 @@ class Trainer:
         start_time = time.time()
         for epoch in range(self.start_epoch, self.cfg.optim.epochs):
             epoch_losses = self._train_one_epoch()
-            self.history.append({"epoch": epoch, **epoch_losses})
+            radii_snapshot = self.radii.radii.detach().cpu().tolist()
+            self.history.append({"epoch": epoch, **epoch_losses, "radii": radii_snapshot})
             is_last = epoch == self.cfg.optim.epochs - 1
             if (epoch + 1) % self.cfg.optim.checkpoint_every_n_epochs == 0 or is_last:
                 self._save_checkpoint(epoch)

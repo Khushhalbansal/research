@@ -11,7 +11,14 @@ from lrmc.baselines.base import UNKNOWN_LABEL, EmbeddingBaseline
 
 
 class OCSVMBaseline(EmbeddingBaseline):
-    def __init__(self, encoder, label_map: dict[str, int], nu: float = 0.05, kernel: str = "rbf", gamma="scale"):
+    def __init__(
+        self,
+        encoder,
+        label_map: dict[str, int],
+        nu: float = 0.05,
+        kernel: str = "rbf",
+        gamma="scale",
+    ):
         super().__init__(encoder, label_map)
         self.model = OneClassSVM(nu=nu, kernel=kernel, gamma=gamma)
 

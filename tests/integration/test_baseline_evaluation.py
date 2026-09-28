@@ -20,16 +20,22 @@ def test_run_baseline_evaluation_produces_full_metrics_bundle(tmp_path):
     gen = ImageGenerator(image_size=32)
 
     encoder = FeatureExtractionNetwork(
-        BackboneConfig(name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16, num_heads=2),
+        BackboneConfig(
+            name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16, num_heads=2
+        ),
         ProjectionHeadConfig(hidden_dim=16, out_dim=8),
     )
     encoder.eval()
 
     train_loader = DataLoader(
-        EvalMalwareDataset(loader, fold.train, gen, label_map), batch_size=8, collate_fn=eval_collate_fn
+        EvalMalwareDataset(loader, fold.train, gen, label_map),
+        batch_size=8,
+        collate_fn=eval_collate_fn,
     )
     val_loader = DataLoader(
-        EvalMalwareDataset(loader, fold.val_known, gen, label_map), batch_size=8, collate_fn=eval_collate_fn
+        EvalMalwareDataset(loader, fold.val_known, gen, label_map),
+        batch_size=8,
+        collate_fn=eval_collate_fn,
     )
 
     baseline = PrototypeCosineBaseline(encoder, label_map)
@@ -38,7 +44,9 @@ def test_run_baseline_evaluation_produces_full_metrics_bundle(tmp_path):
 
     cfg = Config()
     cfg.data.image_size = 32
-    metrics = run_baseline_evaluation(cfg, loader, fold, baseline, gen, method_name="prototype_cosine")
+    metrics = run_baseline_evaluation(
+        cfg, loader, fold, baseline, gen, method_name="prototype_cosine"
+    )
 
     assert metrics["method"] == "prototype_cosine"
     assert 0.0 <= metrics["closed_set"]["accuracy"] <= 1.0

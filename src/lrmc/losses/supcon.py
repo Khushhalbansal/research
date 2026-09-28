@@ -28,7 +28,9 @@ class SupConLoss(nn.Module):
         contrast_features = torch.cat(torch.unbind(features, dim=1), dim=0)  # (B*n_views, D)
         flat_labels = labels.repeat(n_views)  # (B*n_views,)
 
-        anchor_dot_contrast = torch.matmul(contrast_features, contrast_features.T) / self.temperature
+        anchor_dot_contrast = (
+            torch.matmul(contrast_features, contrast_features.T) / self.temperature
+        )
         logits_max, _ = anchor_dot_contrast.max(dim=1, keepdim=True)
         logits = anchor_dot_contrast - logits_max.detach()
 

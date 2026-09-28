@@ -178,7 +178,6 @@ class Big2015Loader:
         if resume and self._manifest_path.exists():
             with open(self._manifest_path, encoding="utf-8") as fh:
                 existing_manifest = [Big2015CacheEntry(**e) for e in json.load(fh)]
-        existing_ids = {e.sample_id: e for e in existing_manifest}
 
         n_total = len(labeled)
         can_resume_in_place = (
@@ -192,9 +191,7 @@ class Big2015Loader:
 
         manifest = list(existing_manifest) if can_resume_in_place else []
         already_done = {e.sample_id for e in manifest}
-        todo = [
-            (p, sid, fam, size) for p, sid, fam in labeled if sid not in already_done
-        ]
+        todo = [(p, sid, fam, size) for p, sid, fam in labeled if sid not in already_done]
 
         if todo:
             next_index = len(manifest)
@@ -238,8 +235,7 @@ class Big2015Loader:
             self._memmap_path, dtype=np.uint8, mode="r", shape=(max(n_total, 1), size, size)
         )
         self.records = [
-            SampleRecord(sample_id=e.sample_id, family=e.family, sha256=e.sha256)
-            for e in manifest
+            SampleRecord(sample_id=e.sample_id, family=e.family, sha256=e.sha256) for e in manifest
         ]
 
         family_counts: dict[str, int] = {}

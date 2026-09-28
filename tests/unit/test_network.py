@@ -6,8 +6,14 @@ from lrmc.models.network import FeatureExtractionNetwork
 
 def test_tiny_test_backbone_forward_shape_and_unit_norm():
     backbone_cfg = BackboneConfig(
-        name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16,
-        num_heads=2, mlp_ratio=2.0, in_chans_mode="replicate",
+        name="tiny_test",
+        img_size=32,
+        patch_size=8,
+        depth=2,
+        embed_dim=16,
+        num_heads=2,
+        mlp_ratio=2.0,
+        in_chans_mode="replicate",
     )
     head_cfg = ProjectionHeadConfig(hidden_dim=32, out_dim=8)
     net = FeatureExtractionNetwork(backbone_cfg, head_cfg)
@@ -21,8 +27,14 @@ def test_tiny_test_backbone_forward_shape_and_unit_norm():
 
 def test_adapt_patch_embed_mode_uses_single_channel():
     backbone_cfg = BackboneConfig(
-        name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16,
-        num_heads=2, mlp_ratio=2.0, in_chans_mode="adapt_patch_embed",
+        name="tiny_test",
+        img_size=32,
+        patch_size=8,
+        depth=2,
+        embed_dim=16,
+        num_heads=2,
+        mlp_ratio=2.0,
+        in_chans_mode="adapt_patch_embed",
     )
     head_cfg = ProjectionHeadConfig(hidden_dim=32, out_dim=8)
     net = FeatureExtractionNetwork(backbone_cfg, head_cfg)
@@ -34,7 +46,9 @@ def test_adapt_patch_embed_mode_uses_single_channel():
 
 
 def test_pretrained_source_is_random_init_for_tiny_test():
-    backbone_cfg = BackboneConfig(name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16)
+    backbone_cfg = BackboneConfig(
+        name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16
+    )
     head_cfg = ProjectionHeadConfig(hidden_dim=16, out_dim=8)
     net = FeatureExtractionNetwork(backbone_cfg, head_cfg)
     assert net.pretrained_source == "random_init"

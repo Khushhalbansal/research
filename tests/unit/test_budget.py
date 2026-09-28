@@ -4,7 +4,13 @@ from lrmc.orchestration.budget import estimate_gpu_minutes, measure_cpu_step_sec
 
 def test_measure_cpu_step_seconds_is_positive():
     backbone_cfg = BackboneConfig(
-        name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16, num_heads=2, mlp_ratio=2.0
+        name="tiny_test",
+        img_size=32,
+        patch_size=8,
+        depth=2,
+        embed_dim=16,
+        num_heads=2,
+        mlp_ratio=2.0,
     )
     head_cfg = ProjectionHeadConfig(hidden_dim=16, out_dim=8)
     sec_per_sample = measure_cpu_step_seconds(backbone_cfg, head_cfg, batch_size=4, n_steps=2)

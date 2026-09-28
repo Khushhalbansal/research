@@ -22,10 +22,17 @@ def closed_set_metrics(y_true: np.ndarray, y_pred: np.ndarray, class_names: list
     labels = list(range(len(class_names)))
     return {
         "accuracy": float(accuracy_score(y_true, y_pred)),
-        "macro_f1": float(f1_score(y_true, y_pred, average="macro", labels=labels, zero_division=0)),
+        "macro_f1": float(
+            f1_score(y_true, y_pred, average="macro", labels=labels, zero_division=0)
+        ),
         "confusion_matrix": confusion_matrix(y_true, y_pred, labels=labels).tolist(),
         "per_class_report": classification_report(
-            y_true, y_pred, labels=labels, target_names=class_names, output_dict=True, zero_division=0
+            y_true,
+            y_pred,
+            labels=labels,
+            target_names=class_names,
+            output_dict=True,
+            zero_division=0,
         ),
     }
 
@@ -57,7 +64,9 @@ def unknown_detection_rate(y_unknown_true: np.ndarray, verdict_is_zero_day: np.n
     return float(verdict_is_zero_day[unknown_mask].mean())
 
 
-def known_false_rejection_rate(y_unknown_true: np.ndarray, verdict_is_zero_day: np.ndarray) -> float:
+def known_false_rejection_rate(
+    y_unknown_true: np.ndarray, verdict_is_zero_day: np.ndarray
+) -> float:
     """Fraction of KNOWN samples wrongly flagged zero-day, at the actual threshold."""
     known_mask = ~y_unknown_true.astype(bool)
     if known_mask.sum() == 0:
@@ -121,13 +130,20 @@ def oscr_curve(
     return {"fpr": fprs_sorted.tolist(), "ccr": ccrs_sorted.tolist(), "oscr_auc": auc}
 
 
-def bootstrap_ci(values: np.ndarray, n_boot: int = 1000, alpha: float = 0.05, seed: int = 0) -> dict:
+def bootstrap_ci(
+    values: np.ndarray, n_boot: int = 1000, alpha: float = 0.05, seed: int = 0
+) -> dict:
     """Mean +/- std and a bootstrap (1-alpha) CI for a metric measured across
     folds/seeds."""
     values = np.asarray(values, dtype=float)
     rng = np.random.default_rng(seed)
     if len(values) == 0:
-        return {"mean": float("nan"), "std": float("nan"), "ci_lo": float("nan"), "ci_hi": float("nan")}
+        return {
+            "mean": float("nan"),
+            "std": float("nan"),
+            "ci_lo": float("nan"),
+            "ci_hi": float("nan"),
+        }
     boot_means = np.array(
         [rng.choice(values, size=len(values), replace=True).mean() for _ in range(n_boot)]
     )

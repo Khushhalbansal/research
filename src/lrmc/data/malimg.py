@@ -70,9 +70,7 @@ class MalimgLoader:
 
         for fam_dir in family_dirs:
             family = fam_dir.name
-            images = sorted(
-                p for p in fam_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS
-            )
+            images = sorted(p for p in fam_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
             if not images:
                 continue
             count = 0
@@ -95,13 +93,13 @@ class MalimgLoader:
         n_families = len(family_counts)
         n_images = sum(family_counts.values())
         if n_families != EXPECTED_N_FAMILIES:
-            mismatches.append(
-                f"expected {EXPECTED_N_FAMILIES} families, found {n_families}"
-            )
+            mismatches.append(f"expected {EXPECTED_N_FAMILIES} families, found {n_families}")
         if n_images != EXPECTED_N_IMAGES:
             mismatches.append(f"expected {EXPECTED_N_IMAGES} images, found {n_images}")
 
-        ratio = (max(family_counts.values()) / min(family_counts.values())) if family_counts else 0.0
+        ratio = (
+            (max(family_counts.values()) / min(family_counts.values())) if family_counts else 0.0
+        )
 
         self.report = MalimgReport(
             n_families=n_families,

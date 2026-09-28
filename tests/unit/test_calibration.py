@@ -20,7 +20,9 @@ def test_compute_known_val_distances_groups_by_family():
 
 def test_calibrate_radii_quantile_matches_numpy():
     known_val_distances = {"fam_a": [0.1, 0.2, 0.3, 0.4, 0.5], "fam_b": [1.0, 2.0, 3.0]}
-    radii = calibrate_radii_from_quantile(known_val_distances, target_quantile=0.9, families=["fam_a", "fam_b"])
+    radii = calibrate_radii_from_quantile(
+        known_val_distances, target_quantile=0.9, families=["fam_a", "fam_b"]
+    )
     import numpy as np
 
     assert abs(radii["fam_a"] - np.quantile(known_val_distances["fam_a"], 0.9)) < 1e-9
@@ -28,5 +30,7 @@ def test_calibrate_radii_quantile_matches_numpy():
 
 
 def test_calibrate_radii_missing_family_is_nan_not_zero():
-    radii = calibrate_radii_from_quantile({"fam_a": [0.1, 0.2]}, 0.5, families=["fam_a", "fam_missing"])
+    radii = calibrate_radii_from_quantile(
+        {"fam_a": [0.1, 0.2]}, 0.5, families=["fam_a", "fam_missing"]
+    )
     assert math.isnan(radii["fam_missing"])

@@ -97,9 +97,12 @@ def _run_train_lrmc(job: dict) -> None:
     loader = build_loader(cfg)
     fold = build_fold(cfg, loader)
     trainer = Trainer(cfg, loader, fold)
-    trainer.fit()
-    metrics = run_evaluation(cfg, loader, fold, trainer.checkpoint_path)
+    train_metrics = trainer.fit()
     out_dir = Path(cfg.output_dir)
+    write_metrics_json(train_metrics, out_dir / "train_metrics.json")
+    metrics = run_evaluation(
+        cfg, loader, fold, trainer.checkpoint_path, save_arrays_path=out_dir / "raw_eval_arrays.npz"
+    )
     write_metrics_json(metrics, out_dir / "metrics.json")
     fold.to_json(out_dir / "fold.json")
 
@@ -118,8 +121,17 @@ def _run_baseline_network(job: dict) -> None:
     baseline.fit(train_loader)
     baseline.calibrate(val_loader)
 
-    metrics = run_baseline_evaluation(cfg, loader, fold, baseline, gen, method_name=baseline_name)
-    write_metrics_json(metrics, _job_output_dir(job) / "metrics.json")
+    out_dir = _job_output_dir(job)
+    metrics = run_baseline_evaluation(
+        cfg,
+        loader,
+        fold,
+        baseline,
+        gen,
+        method_name=baseline_name,
+        save_arrays_path=out_dir / "raw_eval_arrays.npz",
+    )
+    write_metrics_json(metrics, out_dir / "metrics.json")
 
 
 def _run_baseline_embedding(job: dict) -> None:
@@ -146,8 +158,17 @@ def _run_baseline_embedding(job: dict) -> None:
     baseline.fit(train_loader)
     baseline.calibrate(val_loader)
 
-    metrics = run_baseline_evaluation(cfg, loader, fold, baseline, gen, method_name=baseline_name)
-    write_metrics_json(metrics, _job_output_dir(job) / "metrics.json")
+    out_dir = _job_output_dir(job)
+    metrics = run_baseline_evaluation(
+        cfg,
+        loader,
+        fold,
+        baseline,
+        gen,
+        method_name=baseline_name,
+        save_arrays_path=out_dir / "raw_eval_arrays.npz",
+    )
+    write_metrics_json(metrics, out_dir / "metrics.json")
 
 
 _DISPATCH = {
@@ -197,12 +218,18 @@ class QueueRunner:
                         est,
                         job["name"],
                     )
-                    results.append(JobResult(job["name"], tier_name, "skipped_budget", estimated_gpu_minutes=est))
+                    results.append(
+                        JobResult(
+                            job["name"], tier_name, "skipped_budget", estimated_gpu_minutes=est
+                        )
+                    )
                     self._save_state(results)
                     return results
 
                 if self.dry_run:
-                    results.append(JobResult(job["name"], tier_name, "dry_run", estimated_gpu_minutes=est))
+                    results.append(
+                        JobResult(job["name"], tier_name, "dry_run", estimated_gpu_minutes=est)
+                    )
                     continue
 
                 t0 = time.time()
@@ -210,12 +237,28 @@ class QueueRunner:
                     _DISPATCH[job["type"]](job)
                     elapsed = (time.time() - t0) / 60.0
                     results.append(
-                        JobResult(job["name"], tier_name, "completed", elapsed_minutes=elapsed, estimated_gpu_minutes=est)
+                        JobResult(
+                            job["name"],
+                            tier_name,
+                            "completed",
+                            elapsed_minutes=elapsed,
+                            estimated_gpu_minutes=est,
+                        )
                     )
                     logger.info("Completed job '%s' in %.1f min", job["name"], elapsed)
                 except Exception as exc:  # noqa: BLE001 - one bad job must not kill the queue
-                    logger.error("Job '%s' failed: %s\n%s", job["name"], exc, traceback.format_exc())
-                    results.append(JobResult(job["name"], tier_name, "failed", error=str(exc), estimated_gpu_minutes=est))
+                    logger.error(
+                        "Job '%s' failed: %s\n%s", job["name"], exc, traceback.format_exc()
+                    )
+                    results.append(
+                        JobResult(
+                            job["name"],
+                            tier_name,
+                            "failed",
+                            error=str(exc),
+                            estimated_gpu_minutes=est,
+                        )
+                    )
                 self._save_state(results)
         self._save_state(results)
         return results

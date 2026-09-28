@@ -101,7 +101,9 @@ class ViTBackbone(nn.Module):
                 "small-dataset performance -- see docs/DECISIONS.md.",
                 timm_name,
             )
-        model = timm.create_model(timm_name, pretrained=False, num_classes=0, in_chans=self.in_chans)
+        model = timm.create_model(
+            timm_name, pretrained=False, num_classes=0, in_chans=self.in_chans
+        )
         self.pretrained_source = PRETRAINED_SOURCE_RANDOM
         return model
 

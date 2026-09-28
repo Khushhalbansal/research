@@ -92,9 +92,7 @@ def class_balanced_sampler(
     return WeightedRandomSampler(weights, num_samples=len(sample_ids), replacement=True)
 
 
-def compute_class_weights(
-    loader, sample_ids: list[str], label_map: dict[str, int]
-) -> torch.Tensor:
+def compute_class_weights(loader, sample_ids: list[str], label_map: dict[str, int]) -> torch.Tensor:
     """Inverse-frequency class weights, indexed by label id, for weighted CE losses."""
     family_by_id = {r.sample_id: r.family for r in loader.records}
     counts = Counter(family_by_id[sid] for sid in sample_ids)

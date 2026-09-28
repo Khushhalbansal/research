@@ -91,9 +91,7 @@ def test_group_aware_holdout_never_splits_a_group():
         "Fam3": "GroupB",
     }
     for seed in range(10):
-        fold = group_aware_holdout(
-            records, family_to_group, n_unknown_groups=2, seed=seed
-        )
+        fold = group_aware_holdout(records, family_to_group, n_unknown_groups=2, seed=seed)
         assert_group_disjoint(fold, family_to_group)
         assert_fold_disjoint(fold, records)
         # if GroupA's Fam0 is unknown, Fam1 must be too (and vice versa)
@@ -106,7 +104,9 @@ def test_group_aware_holdout_never_splits_a_group():
 def test_naive_random_k_unknown_can_split_a_group_by_construction():
     """Documents the known leakage risk of the naive protocol (vs. group-aware)."""
     records = _mk_records(n_families=8)
-    family_to_group = {"Fam0": "GroupA", "Fam1": "GroupA"}
+    # Fam0/Fam1 would be a variant group under group_aware_holdout; the naive
+    # protocol below has no such concept and can split them across the
+    # known/unknown boundary purely by chance.
     split_found = False
     for seed in range(30):
         fold = random_k_unknown(records, n_unknown=3, seed=seed)

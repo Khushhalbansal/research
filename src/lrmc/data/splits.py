@@ -125,7 +125,7 @@ def stratified_hash_split(
     val_hashes: list[str] = []
     test_hashes: list[str] = []
 
-    for fam, hashes in groups_by_family.items():
+    for _fam, hashes in groups_by_family.items():
         hashes = sorted(hashes)
         rng.shuffle(hashes)
         n = len(hashes)
@@ -343,7 +343,9 @@ def assert_fold_disjoint(fold: Fold, records: list[SampleRecord]) -> None:
 
 def assert_group_disjoint(fold: Fold, family_to_group: dict[str, str]) -> None:
     """For group-aware folds: no group may have members in both known and unknown."""
-    known = set(fold.known_families) | ({fold.pseudo_unknown_family} if fold.pseudo_unknown_family else set())
+    known = set(fold.known_families) | (
+        {fold.pseudo_unknown_family} if fold.pseudo_unknown_family else set()
+    )
     unknown = set(fold.unknown_families)
     known_groups = {family_to_group.get(f, f"__singleton__{f}") for f in known}
     unknown_groups = {family_to_group.get(f, f"__singleton__{f}") for f in unknown}

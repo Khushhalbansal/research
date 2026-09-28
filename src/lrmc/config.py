@@ -88,7 +88,9 @@ class DataConfig:
 
 @dataclass
 class SplitConfig:
-    protocol: str = "random_k_unknown"  # "leave_one_family_out" | "random_k_unknown" | "group_aware"
+    protocol: str = (
+        "random_k_unknown"  # "leave_one_family_out" | "random_k_unknown" | "group_aware"
+    )
     n_unknown: int = 2
     seed: int = 0
     val_frac: float = 0.15

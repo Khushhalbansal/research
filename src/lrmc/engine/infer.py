@@ -40,7 +40,13 @@ class DistanceCalculator:
 class ZeroDayClassifier:
     """Applies the radius-ratio decision rule: s(x) = min_c d(z,p_c)/r_c."""
 
-    def __init__(self, radii: torch.Tensor, families: list[str], kappa: float = 1.0, score_mode: str = "ratio"):
+    def __init__(
+        self,
+        radii: torch.Tensor,
+        families: list[str],
+        kappa: float = 1.0,
+        score_mode: str = "ratio",
+    ):
         self.radii = radii  # (K,)
         self.families = families
         self.kappa = kappa
@@ -107,7 +113,9 @@ class FrozenInferenceEngine:
         prototypes = ckpt["prototypes_state"]["prototypes"]  # (K, D)
         radii = torch.nn.functional.softplus(ckpt["radii_state"]["rho"])  # (K,)
 
-        self.distance_calc = DistanceCalculator(prototypes, self.families, metric=cfg.loss.distance_metric)
+        self.distance_calc = DistanceCalculator(
+            prototypes, self.families, metric=cfg.loss.distance_metric
+        )
         self.classifier = ZeroDayClassifier(
             radii, self.families, kappa=cfg.inference.kappa, score_mode=cfg.inference.score
         )

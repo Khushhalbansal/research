@@ -39,7 +39,9 @@ def build_loader(cfg: Config):
     if dataset == "mock_big2015":
         if not Path(cfg.data.root).exists():
             generate_mock_big2015(cfg.data.root, seed=cfg.seed)
-        loader = Big2015Loader(cfg.data.root, cfg.data.cache_dir, intermediate_size=cfg.data.intermediate_size)
+        loader = Big2015Loader(
+            cfg.data.root, cfg.data.cache_dir, intermediate_size=cfg.data.intermediate_size
+        )
         loader.build_cache()
         return loader
     raise ValueError(f"unknown dataset '{dataset}'")

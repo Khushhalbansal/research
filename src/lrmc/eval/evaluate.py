@@ -12,9 +12,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from lrmc.config import Config, config_hash
+from lrmc.config import Config, config_hash, config_to_dict
 from lrmc.data.image_generator import ImageGenerator
 from lrmc.data.splits import Fold
+from lrmc.engine.infer import FrozenInferenceEngine
 from lrmc.eval.efficiency import efficiency_report
 from lrmc.eval.metrics import (
     closed_set_metrics,
@@ -24,29 +25,43 @@ from lrmc.eval.metrics import (
     oscr_curve,
     unknown_detection_rate,
 )
-from lrmc.engine.infer import FrozenInferenceEngine
 from lrmc.utils.env_info import env_snapshot
 
 
-def _predict_all(engine: FrozenInferenceEngine, loader, sample_ids: list[str], image_gen: ImageGenerator):
+def _predict_all(
+    engine: FrozenInferenceEngine, loader, sample_ids: list[str], image_gen: ImageGenerator
+):
     outputs = []
+    embeddings = []
     family_by_id = {r.sample_id: r.family for r in loader.records}
     for sid in sample_ids:
         arr, is_image = loader.get_array(sid)
         image = image_gen.eval_view(arr, is_pre_rendered_image=is_image)
         out = engine.predict(image)
+        z = engine.embed(image).squeeze(0).numpy()
         outputs.append((sid, family_by_id[sid], out))
-    return outputs
+        embeddings.append(z)
+    return outputs, np.stack(embeddings) if embeddings else np.zeros((0, 1))
 
 
-def run_evaluation(cfg: Config, loader, fold: Fold, checkpoint_path: str | Path) -> dict:
+def run_evaluation(
+    cfg: Config,
+    loader,
+    fold: Fold,
+    checkpoint_path: str | Path,
+    save_arrays_path: str | Path | None = None,
+) -> dict:
+    """``save_arrays_path``, if given, additionally writes an .npz with raw
+    per-sample scores/embeddings/prototypes/radii -- inputs the figures in
+    ``aggregate/figures.py`` need (score histograms, embedding projections,
+    radii-vs-epoch is read separately from train_metrics.json's history)."""
     start = time.time()
     engine = FrozenInferenceEngine(cfg, checkpoint_path)
     image_gen = ImageGenerator(image_size=cfg.data.image_size)
     families = engine.families
 
-    known_outputs = _predict_all(engine, loader, fold.test_known, image_gen)
-    unknown_outputs = _predict_all(engine, loader, fold.test_unknown, image_gen)
+    known_outputs, known_embeddings = _predict_all(engine, loader, fold.test_known, image_gen)
+    unknown_outputs, unknown_embeddings = _predict_all(engine, loader, fold.test_unknown, image_gen)
 
     known_true = [fam for _, fam, _ in known_outputs]
     known_pred = [out.nearest_family for _, _, out in known_outputs]
@@ -59,6 +74,22 @@ def run_evaluation(cfg: Config, loader, fold: Fold, checkpoint_path: str | Path)
 
     dummy_batch = torch.rand(1, 1, cfg.data.image_size, cfg.data.image_size)
     eff = efficiency_report(engine.network, dummy_batch, torch.device(cfg.device))
+
+    if save_arrays_path is not None:
+        Path(save_arrays_path).parent.mkdir(parents=True, exist_ok=True)
+        np.savez(
+            save_arrays_path,
+            families=np.array(families),
+            known_true=np.array(known_true),
+            known_pred=np.array(known_pred),
+            known_scores=known_scores,
+            known_embeddings=known_embeddings,
+            unknown_pred=np.array(unknown_pred),
+            unknown_scores=unknown_scores,
+            unknown_embeddings=unknown_embeddings,
+            prototypes=engine.distance_calc.prototypes.numpy(),
+            radii=engine.classifier.radii.numpy(),
+        )
 
     return _assemble_metrics(
         cfg,
@@ -102,26 +133,37 @@ def _assemble_metrics(
 
     y_unknown_true = np.concatenate([np.zeros(len(known_scores)), np.ones(len(unknown_scores))])
     all_scores = np.concatenate([known_scores, unknown_scores])
-    open_metrics = open_set_auroc_aupr(y_unknown_true, all_scores) if len(unknown_scores) > 0 else {}
+    open_metrics = (
+        open_set_auroc_aupr(y_unknown_true, all_scores) if len(unknown_scores) > 0 else {}
+    )
 
     verdict_is_zero_day = np.concatenate([known_verdict_zero_day, unknown_verdict_zero_day])
     udr = (
-        unknown_detection_rate(y_unknown_true, verdict_is_zero_day) if len(unknown_scores) > 0 else float("nan")
+        unknown_detection_rate(y_unknown_true, verdict_is_zero_day)
+        if len(unknown_scores) > 0
+        else float("nan")
     )
     frr = known_false_rejection_rate(y_unknown_true, verdict_is_zero_day)
 
     known_correct = y_true == y_pred
-    oscr = oscr_curve(known_scores, known_correct, unknown_scores) if len(unknown_scores) > 0 else {}
+    oscr = (
+        oscr_curve(known_scores, known_correct, unknown_scores) if len(unknown_scores) > 0 else {}
+    )
 
     y_true_family_all = list(known_true) + ["UNKNOWN"] * len(unknown_pred)
     y_pred_family_all = [
-        (p if not zd else "UNKNOWN") for p, zd in zip(known_pred, known_verdict_zero_day, strict=True)
-    ] + [(p if not zd else "UNKNOWN") for p, zd in zip(unknown_pred, unknown_verdict_zero_day, strict=True)]
+        (p if not zd else "UNKNOWN")
+        for p, zd in zip(known_pred, known_verdict_zero_day, strict=True)
+    ] + [
+        (p if not zd else "UNKNOWN")
+        for p, zd in zip(unknown_pred, unknown_verdict_zero_day, strict=True)
+    ]
     open_f1 = open_set_macro_f1(y_true_family_all, y_pred_family_all, families)
 
     result = {
         "run_name": cfg.run_name,
         "config_hash": config_hash(cfg),
+        "config": config_to_dict(cfg),
         "seed": cfg.seed,
         "is_synthetic": cfg.is_synthetic,
         "known_families": fold.known_families,
@@ -132,7 +174,11 @@ def _assemble_metrics(
         "n_test_known": len(fold.test_known),
         "n_test_unknown": len(fold.test_unknown),
         "closed_set": closed,
-        "open_set": {**open_metrics, "unknown_detection_rate": udr, "known_false_rejection_rate": frr},
+        "open_set": {
+            **open_metrics,
+            "unknown_detection_rate": udr,
+            "known_false_rejection_rate": frr,
+        },
         "oscr": oscr,
         "open_set_macro_f1": open_f1,
         "efficiency": efficiency,
@@ -147,7 +193,13 @@ def _assemble_metrics(
 
 
 def run_baseline_evaluation(
-    cfg: Config, loader, fold: Fold, baseline, image_gen: ImageGenerator, method_name: str
+    cfg: Config,
+    loader,
+    fold: Fold,
+    baseline,
+    image_gen: ImageGenerator,
+    method_name: str,
+    save_arrays_path: str | Path | None = None,
 ) -> dict:
     """Evaluates any BaselineDetector (fit/calibrate already called by the
     caller) with exactly the same metrics bundle as ``run_evaluation`` uses
@@ -171,10 +223,24 @@ def run_baseline_evaluation(
     _unk_true, unknown_pred, unknown_scores, unknown_zd = _collect(fold.test_unknown)
 
     dummy = torch.rand(1, 1, cfg.data.image_size, cfg.data.image_size)
-    encoder = getattr(baseline, "encoder", None) or getattr(baseline, "net", None) or getattr(
-        baseline, "backbone", None
+    encoder = (
+        getattr(baseline, "encoder", None)
+        or getattr(baseline, "net", None)
+        or getattr(baseline, "backbone", None)
     )
     eff = efficiency_report(encoder, dummy, torch.device(cfg.device)) if encoder is not None else {}
+
+    if save_arrays_path is not None:
+        Path(save_arrays_path).parent.mkdir(parents=True, exist_ok=True)
+        np.savez(
+            save_arrays_path,
+            families=np.array(families),
+            known_true=np.array(known_true),
+            known_pred=np.array(known_pred),
+            known_scores=known_scores,
+            unknown_pred=np.array(unknown_pred),
+            unknown_scores=unknown_scores,
+        )
 
     return _assemble_metrics(
         cfg,

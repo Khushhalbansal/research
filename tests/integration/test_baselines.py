@@ -26,7 +26,13 @@ from lrmc.models.network import FeatureExtractionNetwork
 
 def _backbone_cfg():
     return BackboneConfig(
-        name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16, num_heads=2, mlp_ratio=2.0
+        name="tiny_test",
+        img_size=32,
+        patch_size=8,
+        depth=2,
+        embed_dim=16,
+        num_heads=2,
+        mlp_ratio=2.0,
     )
 
 
@@ -48,7 +54,9 @@ def baseline_fixture(tmp_path_factory):
     test_known_ds = EvalMalwareDataset(loader, fold.test_known, gen, label_map)
     test_unknown_ds = EvalMalwareDataset(loader, fold.test_unknown, gen, label_map)
 
-    encoder = FeatureExtractionNetwork(_backbone_cfg(), ProjectionHeadConfig(hidden_dim=16, out_dim=8))
+    encoder = FeatureExtractionNetwork(
+        _backbone_cfg(), ProjectionHeadConfig(hidden_dim=16, out_dim=8)
+    )
     encoder.eval()
 
     return {
@@ -90,7 +98,9 @@ def test_prototype_cosine_baseline(baseline_fixture):
 
 
 def test_fixed_radius_prototype_baseline(baseline_fixture):
-    b = FixedRadiusPrototypeBaseline(baseline_fixture["encoder"], baseline_fixture["label_map"], quantile=0.9)
+    b = FixedRadiusPrototypeBaseline(
+        baseline_fixture["encoder"], baseline_fixture["label_map"], quantile=0.9
+    )
     _check_baseline(b, baseline_fixture)
 
 
@@ -130,8 +140,10 @@ def test_openmax_baseline(baseline_fixture):
 
 
 def test_fixed_radius_baseline_matches_manual_quantile(baseline_fixture):
-    b = FixedRadiusPrototypeBaseline(baseline_fixture["encoder"], baseline_fixture["label_map"], quantile=0.8)
+    b = FixedRadiusPrototypeBaseline(
+        baseline_fixture["encoder"], baseline_fixture["label_map"], quantile=0.8
+    )
     b.fit(baseline_fixture["train_loader"])
-    for fam_idx, radius in enumerate(b.radii):
+    for radius in b.radii:
         if not np.isnan(radius):
             assert radius >= 0.0

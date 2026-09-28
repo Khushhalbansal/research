@@ -25,7 +25,13 @@ from lrmc.orchestration.budget import (  # noqa: E402
 
 def main() -> None:
     tiny = BackboneConfig(
-        name="tiny_test", img_size=32, patch_size=8, depth=2, embed_dim=16, num_heads=2, mlp_ratio=2.0
+        name="tiny_test",
+        img_size=32,
+        patch_size=8,
+        depth=2,
+        embed_dim=16,
+        num_heads=2,
+        mlp_ratio=2.0,
     )
     head = ProjectionHeadConfig(hidden_dim=16, out_dim=8)
     sec_per_sample = measure_cpu_step_seconds(tiny, head, batch_size=8, n_steps=6)
@@ -50,7 +56,10 @@ def main() -> None:
     ]
     for name, epochs, n, ratio in scenarios:
         est = estimate_gpu_minutes(
-            n_epochs=epochs, n_train_samples=n, cpu_sec_per_sample_tiny=sec_per_sample, flops_ratio=ratio
+            n_epochs=epochs,
+            n_train_samples=n,
+            cpu_sec_per_sample_tiny=sec_per_sample,
+            flops_ratio=ratio,
         )
         print(f"{name}: {est['estimated_gpu_minutes']:.1f} min (estimated=True)")
 

@@ -52,5 +52,5 @@ def test_trainer_loss_is_finite_and_decreases_roughly(tmp_path):
     metrics = trainer.fit()
 
     losses = [h["total"] for h in metrics["history"]]
-    assert all(l == l for l in losses)  # no NaNs
+    assert all(loss_val == loss_val for loss_val in losses)  # no NaNs
     assert losses[-1] < losses[0] + 1.0  # sanity: not exploding
