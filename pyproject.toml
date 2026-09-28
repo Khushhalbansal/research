@@ -17,6 +17,7 @@ dependencies = [
     "pyyaml",
     "py7zr",
     "tqdm",
+    "psutil",
 ]
 
 [project.optional-dependencies]
