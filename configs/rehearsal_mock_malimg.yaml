@@ -1,0 +1,71 @@
+# CPU rehearsal config: mock Malimg-style data, tiny_test backbone. This is
+# what `make rehearsal` runs today -- every number it produces MUST carry
+# is_synthetic: true and MUST be excluded by `aggregate` from paper tables.
+run_name: rehearsal_mock_malimg
+seed: 0
+device: cpu
+is_synthetic: true
+
+backbone:
+  name: tiny_test
+  img_size: 32
+  patch_size: 8
+  depth: 2
+  embed_dim: 16
+  num_heads: 2
+  mlp_ratio: 2.0
+  pretrained: false
+  in_chans_mode: replicate
+
+projection_head:
+  hidden_dim: 16
+  out_dim: 8
+
+prototypes:
+  mode: ema
+  momentum: 0.9
+
+radius:
+  r_init: 0.5
+  lr_multiplier: 10.0
+
+loss:
+  temperature: 0.1
+  alpha: 1.0
+  beta: 1.0
+  gamma: 0.1
+  margin: 0.1
+  distance_metric: cosine
+
+data:
+  dataset: mock_malimg
+  root: data_cache/mock_malimg
+  cache_dir: data_cache/cache
+  image_size: 32
+  intermediate_size: 64
+  batch_size: 8
+  num_workers: 0
+  class_balanced_sampling: true
+
+split:
+  protocol: random_k_unknown
+  n_unknown: 2
+  seed: 0
+  val_frac: 0.15
+  test_frac: 0.2
+  pseudo_unknown: true
+  group_aware: false
+
+optim:
+  lr: 0.001
+  weight_decay: 0.0001
+  epochs: 2
+  warmup_epochs: 0
+  grad_accumulation_steps: 1
+  checkpoint_every_n_epochs: 1
+
+inference:
+  kappa: 1.0
+  score: ratio
+
+output_dir: runs/rehearsal_mock_malimg

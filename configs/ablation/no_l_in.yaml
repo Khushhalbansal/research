@@ -1,0 +1,74 @@
+run_name: ablation_no_l_in
+seed: 0
+device: cuda
+is_synthetic: false
+backbone:
+  name: vit_tiny_patch16_224
+  img_size: 224
+  patch_size: 8
+  depth: 2
+  embed_dim: 64
+  num_heads: 2
+  mlp_ratio: 2.0
+  pretrained: true
+  local_weights_path: null
+  in_chans_mode: replicate
+projection_head:
+  hidden_dim: 512
+  out_dim: 128
+prototypes:
+  mode: ema
+  momentum: 0.9
+radius:
+  r_init: 0.5
+  lr_multiplier: 10.0
+loss:
+  temperature: 0.1
+  alpha: 0.0
+  beta: 1.0
+  gamma: 0.1
+  margin: 0.1
+  distance_metric: cosine
+data:
+  dataset: malimg
+  root: /kaggle/input/malimg-dataset
+  cache_dir: /kaggle/working/cache
+  image_size: 224
+  intermediate_size: 256
+  batch_size: 64
+  num_workers: 2
+  class_balanced_sampling: true
+  augmentation:
+    random_resized_crop_scale:
+    - 0.7
+    - 1.0
+    max_translate_frac: 0.1
+    gaussian_noise_std: 0.03
+    random_erasing_prob: 0.25
+    random_erasing_scale:
+    - 0.02
+    - 0.15
+    byte_truncate_pad_prob: 0.3
+    byte_truncate_pad_frac: 0.1
+split:
+  protocol: group_aware_holdout
+  n_unknown: 3
+  seed: 0
+  val_frac: 0.15
+  test_frac: 0.2
+  pseudo_unknown: true
+  pseudo_unknown_family: null
+  group_aware: true
+  groups_file: configs/data/malimg_groups.yaml
+optim:
+  lr: 0.0003
+  weight_decay: 0.0001
+  epochs: 30
+  warmup_epochs: 2
+  grad_accumulation_steps: 1
+  checkpoint_every_n_epochs: 5
+inference:
+  kappa: 1.0
+  score: ratio
+output_dir: runs/ablation_no_l_in
+extra: {}
