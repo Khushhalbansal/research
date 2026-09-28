@@ -1,0 +1,32 @@
+# Malimg variant-family groups: families in the same group are near-duplicate
+# / packer-variant siblings and MUST be held out together under the
+# group-aware protocol (see docs/DECISIONS.md and data/splits.py).
+#
+# Populated from inspecting the standard Malimg 25-family folder names
+# (Nataraj et al. 2011 release). VERIFY against the actual Kaggle folder
+# listing tomorrow and correct here if names differ -- this file is data, not
+# code, specifically so that correction never requires touching splits.py.
+groups:
+  Allaple:
+    - Allaple.A
+    - Allaple.L
+  C2LOP:
+    - C2LOP.P
+    - C2LOP.gen!g
+  Lolyda.AA:
+    - Lolyda.AA1
+    - Lolyda.AA2
+    - Lolyda.AA3
+  Lolyda.AT:
+    - Lolyda.AT
+  Swizzor.gen:
+    - Swizzor.gen!C
+    - Swizzor.gen!E
+  Yuner:
+    - Yuner.A
+  VB:
+    - VB.AT
+# All other Malimg families (Adialer.C, Agent.FYI, Alueron.gen!J, Autorun.K,
+# Dialplatform.B, Dontovo.A, Fakerean, Instantaccess, Malex.gen!J, Obfuscator.AD,
+# Rbot!gen, Skintrim.N, Wintrim.BX, Dialplatform, Alueron) are treated as
+# singleton groups automatically by data/splits.py when absent from this file.
