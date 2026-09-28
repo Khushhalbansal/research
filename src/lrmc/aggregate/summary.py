@@ -33,8 +33,8 @@ def write_results_summary(runs: list[dict], out_path: str | Path) -> None:
             "excluded from this summary and from every table/figure, per the "
             "mission's non-negotiable no-fabrication rule.",
             "",
-            "Next step: run `lrmc run-queue experiments/queue.yaml` on Kaggle "
-            "(see HANDOFF.md), then re-run `lrmc aggregate`.",
+            "Next step: run `lrmc run-queue experiments/queue.yaml` on the real GPU "
+            "workstation (see HANDOFF.md), then re-run `lrmc aggregate`.",
             "",
         ]
         out_path = Path(out_path)

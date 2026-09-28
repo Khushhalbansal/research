@@ -72,10 +72,11 @@ ABLATIONS: dict[str, tuple[dict, str]] = {
 
 
 # Ablations exist to show a qualitative effect, not to reproduce the main
-# result's full training budget -- running all 23 at the main run's 20 epochs
-# would blow well past Kaggle's 30 GPU-hours/week quota (see
-# docs/DECISIONS.md and experiments/queue.yaml). 15 epochs is documented here
-# as the deliberate, shared reduction for every Tier-B ablation.
+# result's full training budget -- running all 23 (x5 seeds once expanded by
+# `lrmc benchmark`) at the main run's 20 epochs would cost a very large
+# number of GPU-hours for marginal extra signal (see docs/DECISIONS.md and
+# experiments/queue.yaml). 15 epochs is documented here as the deliberate,
+# shared reduction for every Tier-B ablation.
 ABLATION_EPOCHS = 15
 
 

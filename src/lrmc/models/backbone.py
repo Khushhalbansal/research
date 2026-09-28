@@ -70,7 +70,7 @@ class ViTBackbone(nn.Module):
                 return model
             except Exception as exc:  # noqa: BLE001 - deliberately broad: any
                 # download/network failure must fall through to the next tier,
-                # not crash the run (Kaggle may have internet off).
+                # not crash the run (the workstation may have no/restricted internet).
                 logger.warning(
                     "timm pretrained download failed for '%s' (%s); trying local weights",
                     timm_name,

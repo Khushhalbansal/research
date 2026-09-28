@@ -55,8 +55,8 @@ def _write_placeholder(path: str | Path, caption: str) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        "% No non-synthetic runs available yet -- run the real Kaggle queue "
-        "(experiments/queue.yaml) and re-run `lrmc aggregate`.\n"
+        "% No non-synthetic runs available yet -- run the real queue "
+        "(experiments/queue.yaml) on the GPU workstation and re-run `lrmc aggregate`.\n"
         f"% Table: {caption}\n"
         "% (mock/rehearsal runs are deliberately excluded here -- see "
         "docs/DECISIONS.md)\n"

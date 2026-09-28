@@ -3,9 +3,10 @@
 # group-aware protocol (see docs/DECISIONS.md and data/splits.py).
 #
 # Populated from inspecting the standard Malimg 25-family folder names
-# (Nataraj et al. 2011 release). VERIFY against the actual Kaggle folder
-# listing tomorrow and correct here if names differ -- this file is data, not
-# code, specifically so that correction never requires touching splits.py.
+# (Nataraj et al. 2011 release). VERIFY against the actual downloaded folder
+# listing (via `lrmc verify-data`) and correct here if names differ -- this
+# file is data, not code, specifically so that correction never requires
+# touching splits.py.
 groups:
   Allaple:
     - Allaple.A

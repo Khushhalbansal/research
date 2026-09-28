@@ -45,7 +45,11 @@ in both training and (frozen) inference.
 ```
 src/lrmc/
   config.py              # dataclass configs, YAML loading, config hashing
-  utils/                 # seeding, env/version capture, git commit, logging
+  utils/
+    seed.py, env_info.py  # seeding, package/env-version capture, git commit
+    env_detect.py           # "kaggle"/"colab"/"local" detection (informational only)
+    hardware.py              # resolve_device (incl. least-loaded-GPU pick), resolve_num_workers,
+                              #   gpu_status_list, free_disk_bytes, system_summary
   data/
     preprocessor.py       # FilePreprocessor (BIG .bytes parser, raw-exe scan path)
     image_generator.py    # ImageGenerator (Nataraj width table, resize, two-view aug)
@@ -80,12 +84,15 @@ src/lrmc/
     softmax_msp.py, odin_energy.py, openmax.py, mahalanobis.py, knn.py,
     ocsvm.py, deep_svdd.py, fixed_radius_prototype.py, prototype_cosine.py
   orchestration/
-    queue.py                      # priority job runner over experiments/queue.yaml
-    budget.py                      # CPU-throughput -> GPU-minute estimate
+    queue.py                      # priority job runner over experiments/queue.yaml (PID-locked)
+    budget.py                      # CPU-throughput -> GPU-minute estimate (pre-GPU, honest extrapolation)
+    benchmark.py                    # real GPU throughput/max-batch measurement, queue rewrite, multi-seed expansion
+    lock.py                          # QueueLock: PID-file lock, stale-lock reclaim
+    status.py                         # status.json (per-epoch) / current_job.json, read by `lrmc status`
   aggregate/
     collect.py, tables.py, figures.py, facts.py, summary.py
   cli/
-    main.py                        # train / evaluate / infer / scan / run-queue / aggregate
+    main.py    # train / evaluate / infer / scan / run-queue / verify-data / status / benchmark / aggregate
 ```
 
 ## Data flow contracts
@@ -113,4 +120,5 @@ sha256 config hash, fixes `seed` for `random`/`numpy`/`torch`, and writes
 `is_synthetic: true`.
 
 See `docs/LRMC.md` for the loss math and `docs/DECISIONS.md` for design choices made
-under ambiguity, and `HANDOFF.md` for the exact Kaggle run book.
+under ambiguity, and `HANDOFF.md` for the exact college-GPU-workstation run book
+(Kaggle remains usable as an optional profile, see HANDOFF.md section 12).

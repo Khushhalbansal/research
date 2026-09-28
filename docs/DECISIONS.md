@@ -102,3 +102,63 @@ One-line-rationale record of choices made under ambiguity, per the mission's pri
   which `predict(x)` alone can't provide once it returns `"UNKNOWN"`. Added as an
   extra method on every baseline (never a replacement for the required three), so
   the required interface still holds exactly as specified.
+
+## Deployment target change: Kaggle -> college GPU workstation
+
+- **`device: "auto"` in every production config** (base_malimg.yaml,
+  base_big2015.yaml, all 23 generated ablations) rather than a hardcoded
+  `"cuda"`. `resolve_device()` picks the least-loaded GPU when more than one
+  is present (via `nvidia-smi`, falling back to `torch.cuda.mem_get_info`),
+  and falls back to CPU if CUDA is unavailable at all -- since the
+  workstation's GPU count/VRAM is unknown until connection, hardcoding
+  anything more specific would be a guess. `Config.device`'s *dataclass*
+  default stays `"cpu"` (unchanged) so test configs built with `Config()`
+  stay CPU-only unless a test opts in; only the checked-in production YAMLs
+  changed.
+- **`num_workers: -1` is an "auto" sentinel** (resolved by
+  `resolve_num_workers` to `cpu_count() - 1`, capped at 8), used the same
+  way in every production config. `DataConfig.num_workers`'s dataclass
+  default stays `0` for the same test-isolation reason as `device` above.
+- **Multi-seed expansion is seed-major, not job-major**
+  (`expand_queue_with_seeds`): all seed-0 jobs for a tier, then all seed-1
+  jobs, etc., rather than all seeds of job A, then all seeds of job B. This
+  lets a seed's dependent `baseline_embedding` job start as soon as that
+  seed's own `train_lrmc` checkpoint exists, instead of waiting for every
+  seed's main run to finish first -- meaningfully better for a queue that
+  can be interrupted by an AnyDesk disconnect at any point. Caught by a
+  unit test that initially encoded the (worse) job-major order as expected
+  and had to be corrected.
+- **CUDA-OOM backoff halves batch size and grows grad-accumulation by the
+  same factor**, preserving the effective batch size, rather than e.g.
+  halving batch size with a fixed grad-accumulation bump -- keeps the
+  optimizer's effective step statistics roughly unchanged across the
+  adjustment, so an OOM-triggered backoff shouldn't itself change what the
+  run is measuring, only how it's computed.
+- **The OOM-detection condition matches on the string "out of memory" in a
+  `RuntimeError`, not on `torch.cuda.OutOfMemoryError` specifically** (a
+  torch>=2.0-only subclass). This is deliberately broader (also catches
+  older-torch CUDA OOM RuntimeErrors) and, as a side effect, makes the
+  backoff path unit-testable on CPU by simply raising a matching
+  `RuntimeError` -- no real GPU or CUDA OOM condition needed to prove the
+  retry/backoff logic works.
+- **The queue lock is a PID file, not an OS-level file lock
+  (`fcntl`/`msvcrt`)** -- `fcntl` doesn't exist on Windows and `msvcrt`'s
+  locking is a different API, so a single implementation needs either a
+  third-party cross-platform lock library or this simpler PID-file
+  approach. A PID file has a small TOCTOU race (acceptable for a
+  single-operator workstation, not a multi-tenant cluster) but needs no new
+  dependency and reclaims a stale lock (dead PID, e.g. after an unclean
+  reboot) automatically via `psutil.pid_exists`.
+- **`lrmc benchmark` dedups measurement by backbone signature, not by config
+  file** -- 22 of the 23 ablation configs share the exact same architecture
+  as the main run (only loss/split/prototype hyperparameters differ), so
+  measuring throughput per unique `(name, img_size, patch_size, depth,
+  embed_dim, num_heads, mlp_ratio, in_chans_mode, head dims)` tuple instead
+  of per config path avoids ~20 redundant GPU measurements each run of
+  `benchmark` would otherwise cost.
+- **Kaggle is kept as an explicit, documented fallback profile**
+  (`notebooks/kaggle_run.py` unchanged; any config can still be pointed at
+  `/kaggle/...` paths via `--override`), per the instruction not to remove
+  it outright -- but no code path *assumes* Kaggle anymore: `env_detect.py`
+  is informational only, and every dataset path always comes from config or
+  a CLI flag, never from environment detection.
