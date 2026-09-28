@@ -254,7 +254,9 @@ class Trainer:
                     self._handle_cuda_oom(exc)
                     continue
                 raise
-        raise RuntimeError(f"Repeated CUDA OOM after {max_retries} batch-size reductions; giving up")
+        raise RuntimeError(
+            f"Repeated CUDA OOM after {max_retries} batch-size reductions; giving up"
+        )
 
     def fit(self) -> dict:
         self._resume_if_available()

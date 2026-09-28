@@ -20,7 +20,7 @@ import torch
 
 
 def resolve_device(device_str: str, prefer_least_loaded: bool = True) -> torch.device:
-    """"auto" -> least-loaded CUDA GPU if available else cpu.
+    """ "auto" -> least-loaded CUDA GPU if available else cpu.
     "cuda" -> a specific/least-loaded CUDA GPU if available else cpu (never
     raises just because CUDA is unavailable -- matches the existing
     Trainer/FrozenInferenceEngine fallback behavior).

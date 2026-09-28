@@ -1,4 +1,5 @@
-"""CLI entry points: train, evaluate, infer, scan, run-queue, aggregate.
+"""CLI entry points: train, evaluate, infer, scan, run-queue, aggregate,
+verify-data, status, benchmark.
 
 Usage: ``lrmc <command> [args]`` (installed via pyproject.toml's
 ``[project.scripts]``) or ``python -m lrmc.cli.main <command> [args]``.
@@ -7,9 +8,11 @@ Usage: ``lrmc <command> [args]`` (installed via pyproject.toml's
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 from lrmc.config import load_config, merge_overrides
@@ -139,6 +142,119 @@ def cmd_run_queue(args) -> None:
     )
 
 
+def cmd_verify_data(args) -> None:
+    """Reproduces the layout/count/duplicate report on REAL data (Malimg
+    auto-detected folders, or a real BIG2015 root incl. .7z archives), for
+    the manual-copy path (`scripts/fetch_data.py` runs the same check
+    automatically after downloading)."""
+    if args.dataset == "malimg":
+        from lrmc.data.malimg import MalimgLoader
+
+        loader = MalimgLoader(args.root)
+        report = loader.report
+    else:
+        from lrmc.data.big2015 import Big2015Loader
+
+        cache_dir = args.cache_dir or "data_cache/cache_big2015"
+        loader = Big2015Loader(args.root, cache_dir, n_workers=args.workers or 1)
+        report = loader.build_cache()
+
+    print(json.dumps(dataclasses.asdict(report), indent=2, default=str))
+    if report.mismatches:
+        logger.error("%s layout mismatch: %s", args.dataset, report.mismatches)
+        raise SystemExit(1)
+    logger.info("%s layout OK.", args.dataset)
+
+
+def cmd_status(args) -> None:
+    """Current job, epoch, ETA, last checkpoint, GPU utilization, free disk --
+    everything `lrmc run-queue` writes as it goes, read back without needing
+    to tail a log file (useful right after reconnecting over AnyDesk)."""
+    from lrmc.orchestration.status import read_current_job, read_job_status
+    from lrmc.utils.hardware import free_disk_bytes, gpu_status_list
+
+    runs_dir = Path(args.runs_dir)
+    current = read_current_job(runs_dir)
+    if current is None:
+        print("No job currently recorded as running (queue hasn't started, or has finished).")
+    else:
+        print(f"Current job: {current['name']}  (tier {current['tier']}, type {current['type']})")
+        started_at = current.get("started_at")
+        if started_at:
+            ago_min = (time.time() - started_at) / 60
+            print(f"  started {ago_min:.1f} min ago")
+
+        job_status = read_job_status(runs_dir / current["name"])
+        if job_status:
+            epoch, total = job_status.get("epoch"), job_status.get("total_epochs")
+            if epoch is not None and total is not None:
+                print(f"  epoch {epoch + 1}/{total}")
+                epoch_seconds = job_status.get("epoch_seconds")
+                if epoch_seconds:
+                    remaining = total - (epoch + 1)
+                    print(
+                        f"  last epoch: {epoch_seconds:.1f}s -> ETA ~{remaining * epoch_seconds / 60:.1f} min"
+                    )
+            print(f"  losses: {job_status.get('losses')}")
+            print(
+                f"  batch_size={job_status.get('batch_size')} "
+                f"grad_accumulation_steps={job_status.get('grad_accumulation_steps')}"
+            )
+        else:
+            print("  (no per-epoch status yet)")
+
+        ckpt_path = runs_dir / current["name"] / "checkpoint.pt"
+        if ckpt_path.exists():
+            age_min = (time.time() - ckpt_path.stat().st_mtime) / 60
+            print(f"  last checkpoint: {ckpt_path} (saved {age_min:.1f} min ago)")
+        else:
+            print("  no checkpoint saved yet")
+
+    state_path = runs_dir / "queue_state.json"
+    if state_path.exists():
+        with open(state_path, encoding="utf-8") as fh:
+            results = json.load(fh)
+        n_completed = sum(1 for r in results if r["status"] == "completed")
+        print(
+            f"Queue progress: {n_completed} completed / {len(results)} attempted so far ({state_path})"
+        )
+
+    gpus = gpu_status_list()
+    if gpus:
+        for g in gpus:
+            print(
+                f"GPU {g['index']} ({g['name']}): {g['utilization_pct']:.0f}% util, "
+                f"{g['memory_free_mb']:.0f}/{g['memory_total_mb']:.0f} MB free"
+            )
+    else:
+        print("GPU status: unavailable (no nvidia-smi found, or no GPU)")
+
+    print(f"Free disk: {free_disk_bytes(runs_dir) / 1e9:.1f} GB")
+
+
+def cmd_benchmark(args) -> None:
+    from lrmc.orchestration.benchmark import run_benchmark
+    from lrmc.utils.hardware import resolve_device, system_summary
+
+    device = resolve_device(args.device)
+    logger.info("Benchmarking on %s. System: %s", device, system_summary())
+    result = run_benchmark(
+        args.queue,
+        device,
+        n_seeds=args.seeds,
+        seed_tiers=tuple(args.seed_tiers.split(",")),
+        configs_out_dir=args.configs_out_dir,
+        expand_seeds=not args.no_expand_seeds,
+    )
+    logger.info(
+        "Benchmark complete: device=%s, %d jobs after expansion, queue rewritten (backup at %s)",
+        result["device"],
+        result["n_jobs_after"],
+        result["backup_path"],
+    )
+    print(json.dumps(result["measurements"], indent=2))
+
+
 def cmd_aggregate(args) -> None:
     from lrmc.aggregate.collect import collect_runs
     from lrmc.aggregate.facts import write_paper_facts
@@ -201,6 +317,35 @@ def build_parser() -> argparse.ArgumentParser:
     p_queue.add_argument("--budget-minutes", type=float, default=None)
     p_queue.add_argument("--dry-run", action="store_true")
     p_queue.set_defaults(func=cmd_run_queue)
+
+    p_verify = sub.add_parser(
+        "verify-data", help="Verify real dataset layout/counts/duplicates against expectations"
+    )
+    p_verify.add_argument("--dataset", choices=["malimg", "big2015"], required=True)
+    p_verify.add_argument("--root", required=True)
+    p_verify.add_argument("--cache-dir", default=None, help="big2015 only: uint8 cache location")
+    p_verify.add_argument(
+        "--workers", type=int, default=None, help="big2015 only: cache-build workers"
+    )
+    p_verify.set_defaults(func=cmd_verify_data)
+
+    p_status = sub.add_parser(
+        "status", help="Report current job/epoch/ETA/checkpoint/GPU/disk status"
+    )
+    p_status.add_argument("--runs-dir", default="runs")
+    p_status.set_defaults(func=cmd_status)
+
+    p_bench = sub.add_parser(
+        "benchmark",
+        help="Measure real throughput/max batch size and rewrite experiments/queue.yaml",
+    )
+    p_bench.add_argument("--queue", default="experiments/queue.yaml")
+    p_bench.add_argument("--device", default="auto")
+    p_bench.add_argument("--seeds", type=int, default=5)
+    p_bench.add_argument("--seed-tiers", default="A,B")
+    p_bench.add_argument("--configs-out-dir", default="configs/generated")
+    p_bench.add_argument("--no-expand-seeds", action="store_true")
+    p_bench.set_defaults(func=cmd_benchmark)
 
     p_agg = sub.add_parser("aggregate", help="Build paper_artifacts/ from runs/")
     p_agg.add_argument("--runs-dir", default="runs")

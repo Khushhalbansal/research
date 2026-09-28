@@ -41,7 +41,9 @@ def read_job_status(output_dir: str | Path) -> dict | None:
 
 def write_current_job(runs_dir: str | Path, name: str, tier: str, job_type: str) -> None:
     path = Path(runs_dir) / "current_job.json"
-    _atomic_write_json(path, {"name": name, "tier": tier, "type": job_type, "started_at": time.time()})
+    _atomic_write_json(
+        path, {"name": name, "tier": tier, "type": job_type, "started_at": time.time()}
+    )
 
 
 def read_current_job(runs_dir: str | Path) -> dict | None:

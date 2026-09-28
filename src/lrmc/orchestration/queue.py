@@ -46,7 +46,12 @@ from lrmc.engine.train import Trainer
 from lrmc.eval.evaluate import run_baseline_evaluation, run_evaluation, write_metrics_json
 from lrmc.orchestration.lock import QueueLock
 from lrmc.orchestration.status import write_current_job
-from lrmc.utils.hardware import free_disk_bytes, gpu_status_list, resolve_device, resolve_num_workers
+from lrmc.utils.hardware import (
+    free_disk_bytes,
+    gpu_status_list,
+    resolve_device,
+    resolve_num_workers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +97,12 @@ def _build_eval_loaders(cfg: Config, loader, fold: Fold, label_map: dict[str, in
         "pin_memory": device.type == "cuda",
         "persistent_workers": num_workers > 0,
     }
-    train_loader = DataLoader(EvalMalwareDataset(loader, fold.train, gen, label_map), **loader_kwargs)
-    val_loader = DataLoader(EvalMalwareDataset(loader, fold.val_known, gen, label_map), **loader_kwargs)
+    train_loader = DataLoader(
+        EvalMalwareDataset(loader, fold.train, gen, label_map), **loader_kwargs
+    )
+    val_loader = DataLoader(
+        EvalMalwareDataset(loader, fold.val_known, gen, label_map), **loader_kwargs
+    )
     return gen, train_loader, val_loader
 
 
@@ -228,7 +237,9 @@ class QueueRunner:
         free_gb = free_disk_bytes(self.runs_dir) / 1e9
         logger.info("[%s] free disk: %.1f GB", job_name, free_gb)
         if free_gb < 2.0:
-            logger.warning("[%s] free disk is low (%.1f GB) -- consider clearing space", job_name, free_gb)
+            logger.warning(
+                "[%s] free disk is low (%.1f GB) -- consider clearing space", job_name, free_gb
+            )
 
     def run(self) -> list[JobResult]:
         lock = QueueLock(self.runs_dir / ".queue.lock")

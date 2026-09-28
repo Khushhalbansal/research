@@ -38,7 +38,7 @@ def default_working_dir(env: str | None = None) -> Path:
 
 
 def os_name() -> str:
-    """"windows" | "linux" | "darwin" | whatever platform.system() lowercases to."""
+    """ "windows" | "linux" | "darwin" | whatever platform.system() lowercases to."""
     return platform.system().lower()
 
 
