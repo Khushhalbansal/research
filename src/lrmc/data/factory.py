@@ -17,6 +17,7 @@ from lrmc.data.splits import (
     load_family_groups,
     random_k_unknown,
 )
+from lrmc.utils.hardware import resolve_num_workers
 
 
 def build_loader(cfg: Config):
@@ -28,7 +29,7 @@ def build_loader(cfg: Config):
             cfg.data.root,
             cfg.data.cache_dir,
             intermediate_size=cfg.data.intermediate_size,
-            n_workers=max(1, cfg.data.num_workers),
+            n_workers=max(1, resolve_num_workers(cfg.data.num_workers)),
         )
         loader.build_cache()
         return loader
