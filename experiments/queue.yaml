@@ -1,22 +1,24 @@
-# Prioritized job queue for tomorrow's Kaggle run. `lrmc run-queue` executes
-# tiers in order (A -> B -> C), each tier's jobs in list order, skips any job
-# whose runs/<name>/metrics.json already exists, and STOPS (not skips) as
-# soon as the remaining session budget can't cover the next job's
-# estimated_gpu_minutes -- so priority order is preserved across sessions.
+# Prioritized job queue for the college GPU workstation (reached over
+# AnyDesk; session can drop at any time). `lrmc run-queue` executes tiers in
+# order (A -> B -> C), each tier's jobs in list order, skips any job whose
+# runs/<name>/metrics.json already exists, and STOPS (not skips) as soon as
+# the remaining session budget can't cover the next job's
+# estimated_gpu_minutes -- so priority order is preserved across however many
+# reconnects it takes. A PID lock (runs/.queue.lock) stops two run-queue
+# processes from starting at once if you forget one is already going after
+# reconnecting.
 #
-# estimated_gpu_minutes are HONEST EXTRAPOLATIONS, not measurements: derived
-# from an actual measured CPU forward+backward step with the tiny_test
-# preset (src/lrmc/orchestration/budget.py), scaled by the MEASURED approx-
-# FLOPs ratio between tiny_test and the real backbone, divided by an assumed
-# 10x CPU->T4 speedup (conservative; see docs/DECISIONS.md). Re-run
-# `python scripts/estimate_queue_budget.py` to refresh these after any
-# architecture/epoch-count change.
-#
-# Kaggle: ~30 GPU-hours/week, 12-hour sessions. Tier A (~640 min / ~10.7h) is
-# sized to fit in ONE session. Tier B (23 ablations, ~2840 min / ~47h) will
-# span multiple weekly quotas by design -- that's why the runner is resumable
-# and skip-completed. Tier C is a third session's worth.
-session_budget_minutes: 660 # 11h, leaving a safety margin under Kaggle's 12h cap
+# estimated_gpu_minutes below are HONEST EXTRAPOLATIONS from CPU timing, not
+# real GPU measurements -- they were produced before any GPU was available
+# (see docs/DECISIONS.md). Run `python -m lrmc benchmark` once you're on the
+# actual workstation: it measures real throughput on the real GPU, rewrites
+# every estimate here as `estimated: false`, and (with no session-quota
+# constraint on a dedicated machine) expands Tier A/B with multi-seed repeats
+# for statistical power. Until then, `session_budget_minutes` below is a
+# conservative planning default, not a hard external quota like Kaggle's --
+# raise it freely, or pass `--budget-minutes` to `run-queue` to override
+# per-invocation (e.g. "stop by the time I'm back at my desk").
+session_budget_minutes: 660 # ~11h; override freely -- no external quota on a dedicated workstation
 
 tiers:
   A:

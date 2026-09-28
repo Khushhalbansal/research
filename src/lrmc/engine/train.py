@@ -29,7 +29,9 @@ from lrmc.losses.lrmc_loss import LRMCLossCalculator
 from lrmc.models.network import FeatureExtractionNetwork
 from lrmc.models.prototypes import ClassPrototypeEstimator
 from lrmc.models.radii import LearnableRadiiParameters
+from lrmc.orchestration.status import write_job_status
 from lrmc.utils.env_info import env_snapshot
+from lrmc.utils.hardware import resolve_device, resolve_num_workers
 from lrmc.utils.seed import load_rng_state, rng_state, set_seed
 
 logger = logging.getLogger(__name__)
@@ -70,9 +72,7 @@ class Trainer:
             distance_metric=cfg.loss.distance_metric,
         )
 
-        self.device = torch.device(
-            cfg.device if (cfg.device != "cuda" or torch.cuda.is_available()) else "cpu"
-        )
+        self.device = resolve_device(cfg.device)
         self.network.to(self.device)
         self.radii.to(self.device)
         self.prototypes.to(self.device)
@@ -110,15 +110,28 @@ class Trainer:
         self.train_dataset = ContrastiveMalwareDataset(
             loader, fold.train, self.image_gen, self.label_map
         )
-        sampler = None
+        self.sampler = None
         if cfg.data.class_balanced_sampling:
-            sampler = class_balanced_sampler(loader, fold.train, self.label_map)
+            self.sampler = class_balanced_sampler(loader, fold.train, self.label_map)
+        self.status_path = self.output_dir / "status.json"
+        self._build_train_loader()
+
+    def _build_train_loader(self) -> None:
+        """(Re)builds self.train_loader from the current cfg.data.batch_size --
+        called at init and again after an OOM-triggered batch-size reduction
+        (see _handle_cuda_oom). Worker count/pin-memory/persistent-workers are
+        tuned to the actual machine (num_workers<0 means "auto-detect from
+        CPU count"; pinned memory only helps when copying to a CUDA device;
+        persistent_workers requires num_workers>0)."""
+        num_workers = resolve_num_workers(self.cfg.data.num_workers)
         self.train_loader = DataLoader(
             self.train_dataset,
-            batch_size=cfg.data.batch_size,
-            sampler=sampler,
-            shuffle=(sampler is None),
-            num_workers=cfg.data.num_workers,
+            batch_size=self.cfg.data.batch_size,
+            sampler=self.sampler,
+            shuffle=(self.sampler is None),
+            num_workers=num_workers,
+            pin_memory=(self.device.type == "cuda"),
+            persistent_workers=(num_workers > 0),
             collate_fn=contrastive_collate_fn,
         )
 
@@ -209,13 +222,60 @@ class Trainer:
 
         return {k: v / max(n_batches, 1) for k, v in totals.items()}
 
+    def _handle_cuda_oom(self, exc: Exception) -> None:
+        """On a shared/unknown-VRAM GPU, a CUDA OOM should shrink the batch
+        (and grow grad accumulation to preserve the effective batch size)
+        and retry, not crash the whole queue."""
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        old_bs = self.cfg.data.batch_size
+        new_bs = max(1, old_bs // 2)
+        if new_bs == old_bs:
+            raise RuntimeError("CUDA OOM at batch_size=1; cannot reduce further") from exc
+        multiplier = max(1, old_bs // new_bs)
+        self.cfg.data.batch_size = new_bs
+        self.cfg.optim.grad_accumulation_steps *= multiplier
+        logger.warning(
+            "CUDA OOM caught: reducing batch_size %d -> %d and raising "
+            "grad_accumulation_steps to %d (preserves effective batch size ~%d)",
+            old_bs,
+            new_bs,
+            self.cfg.optim.grad_accumulation_steps,
+            old_bs,
+        )
+        self._build_train_loader()
+
+    def _train_one_epoch_with_oom_backoff(self, max_retries: int = 6) -> dict:
+        for _attempt in range(max_retries):
+            try:
+                return self._train_one_epoch()
+            except RuntimeError as exc:
+                if "out of memory" in str(exc).lower():
+                    self._handle_cuda_oom(exc)
+                    continue
+                raise
+        raise RuntimeError(f"Repeated CUDA OOM after {max_retries} batch-size reductions; giving up")
+
     def fit(self) -> dict:
         self._resume_if_available()
         start_time = time.time()
         for epoch in range(self.start_epoch, self.cfg.optim.epochs):
-            epoch_losses = self._train_one_epoch()
+            epoch_start = time.time()
+            epoch_losses = self._train_one_epoch_with_oom_backoff()
+            epoch_seconds = time.time() - epoch_start
             radii_snapshot = self.radii.radii.detach().cpu().tolist()
             self.history.append({"epoch": epoch, **epoch_losses, "radii": radii_snapshot})
+            write_job_status(
+                self.output_dir,
+                run_name=self.cfg.run_name,
+                epoch=epoch,
+                total_epochs=self.cfg.optim.epochs,
+                epoch_seconds=epoch_seconds,
+                losses=epoch_losses,
+                batch_size=self.cfg.data.batch_size,
+                grad_accumulation_steps=self.cfg.optim.grad_accumulation_steps,
+                device=str(self.device),
+            )
             is_last = epoch == self.cfg.optim.epochs - 1
             if (epoch + 1) % self.cfg.optim.checkpoint_every_n_epochs == 0 or is_last:
                 self._save_checkpoint(epoch)

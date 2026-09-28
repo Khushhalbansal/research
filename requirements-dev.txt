@@ -1,0 +1,9 @@
+# Dev-only extras (mirrors pyproject.toml's [project.optional-dependencies].dev).
+-r requirements.txt
+pytest
+ruff
+black
+
+# Optional: only needed for scripts/fetch_data.py's Kaggle-API download path.
+# Not required for the manual-copy + `lrmc verify-data` path.
+kaggle

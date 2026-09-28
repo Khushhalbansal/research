@@ -1,8 +1,10 @@
-# Tier-C config: BIG 2015, real ViT backbone. data.root/cache_dir MUST be
-# overridden to the actual Kaggle input/working paths -- see HANDOFF.md.
+# Tier-C config: BIG 2015, real ViT backbone, for the college GPU workstation.
+# data.root defaults to the path scripts/fetch_data.py downloads to; override
+# with `--override data.root=...` if your data lives elsewhere -- see
+# HANDOFF.md.
 run_name: lrmc_big2015_main
 seed: 0
-device: cuda
+device: auto
 is_synthetic: false
 
 backbone:
@@ -34,12 +36,12 @@ loss:
 
 data:
   dataset: big2015
-  root: /kaggle/input/microsoft-malware-classification-challenge
-  cache_dir: /kaggle/working/cache
+  root: data/big2015
+  cache_dir: data_cache/cache_big2015
   image_size: 224
   intermediate_size: 256
   batch_size: 64
-  num_workers: 2
+  num_workers: -1 # auto-tune to CPU count
   class_balanced_sampling: true
 
 split:

@@ -1,11 +1,18 @@
 """Priority job runner over experiments/queue.yaml.
 
 Executes tiers A -> B -> C in file order, skips jobs whose metrics.json
-already exists (resumable across Kaggle sessions), and STOPS gracefully
-(rather than skip-and-continue, which would break priority order) as soon as
-the remaining session budget can no longer cover the next job's estimated
-GPU-minutes. Every job failure is caught and logged so one bad job never
-takes down the rest of the queue.
+already exists (resumable across a disconnect-prone AnyDesk session), and
+STOPS gracefully (rather than skip-and-continue, which would break priority
+order) as soon as the remaining session budget can no longer cover the next
+job's estimated GPU-minutes. Every job failure is caught and logged so one
+bad job never takes down the rest of the queue.
+
+A PID lock file (runs/.queue.lock, see orchestration/lock.py) prevents a
+second `run-queue` from starting while one is already in progress -- easy to
+trigger by accident after an AnyDesk reconnect. Before each job, the
+currently-selected GPU's free VRAM/utilization is logged (see
+utils/hardware.py); actual OOM handling (shrink batch, grow grad
+accumulation, retry) happens inside Trainer itself.
 """
 
 from __future__ import annotations
@@ -37,6 +44,9 @@ from lrmc.data.splits import Fold
 from lrmc.engine.infer import FrozenInferenceEngine
 from lrmc.engine.train import Trainer
 from lrmc.eval.evaluate import run_baseline_evaluation, run_evaluation, write_metrics_json
+from lrmc.orchestration.lock import QueueLock
+from lrmc.orchestration.status import write_current_job
+from lrmc.utils.hardware import free_disk_bytes, gpu_status_list, resolve_device, resolve_num_workers
 
 logger = logging.getLogger(__name__)
 
@@ -72,18 +82,18 @@ def _job_output_dir(job: dict) -> Path:
 
 def _build_eval_loaders(cfg: Config, loader, fold: Fold, label_map: dict[str, int]):
     gen = ImageGenerator(image_size=cfg.data.image_size)
-    train_loader = DataLoader(
-        EvalMalwareDataset(loader, fold.train, gen, label_map),
-        batch_size=cfg.data.batch_size,
-        shuffle=False,
-        collate_fn=eval_collate_fn,
-    )
-    val_loader = DataLoader(
-        EvalMalwareDataset(loader, fold.val_known, gen, label_map),
-        batch_size=cfg.data.batch_size,
-        shuffle=False,
-        collate_fn=eval_collate_fn,
-    )
+    device = resolve_device(cfg.device)
+    num_workers = resolve_num_workers(cfg.data.num_workers)
+    loader_kwargs = {
+        "batch_size": cfg.data.batch_size,
+        "shuffle": False,
+        "collate_fn": eval_collate_fn,
+        "num_workers": num_workers,
+        "pin_memory": device.type == "cuda",
+        "persistent_workers": num_workers > 0,
+    }
+    train_loader = DataLoader(EvalMalwareDataset(loader, fold.train, gen, label_map), **loader_kwargs)
+    val_loader = DataLoader(EvalMalwareDataset(loader, fold.val_known, gen, label_map), **loader_kwargs)
     return gen, train_loader, val_loader
 
 
@@ -117,7 +127,7 @@ def _run_baseline_network(job: dict) -> None:
     baseline_name = job["baseline"]
     params = job.get("params", {})
     cls = _NETWORK_BASELINES[baseline_name]
-    baseline = cls(cfg.backbone, label_map, device=cfg.device, **params)
+    baseline = cls(cfg.backbone, label_map, device=str(resolve_device(cfg.device)), **params)
     baseline.fit(train_loader)
     baseline.calibrate(val_loader)
 
@@ -185,6 +195,7 @@ class QueueRunner:
         session_budget_minutes: float | None = None,
         dry_run: bool = False,
         runs_dir: str | Path = "runs",
+        use_lock: bool = True,
     ):
         with open(queue_path, encoding="utf-8") as fh:
             self.queue = yaml.safe_load(fh)
@@ -195,12 +206,44 @@ class QueueRunner:
         )
         self.dry_run = dry_run
         self.runs_dir = Path(runs_dir)
+        self.use_lock = use_lock
         self.start_time = time.time()
 
     def _elapsed_minutes(self) -> float:
         return (time.time() - self.start_time) / 60.0
 
+    def _log_pre_job_resources(self, job_name: str) -> None:
+        gpus = gpu_status_list()
+        if gpus:
+            for g in gpus:
+                logger.info(
+                    "[%s] GPU %d (%s): %.0f%% util, %.0f/%.0f MB free",
+                    job_name,
+                    g["index"],
+                    g["name"],
+                    g["utilization_pct"],
+                    g["memory_free_mb"],
+                    g["memory_total_mb"],
+                )
+        free_gb = free_disk_bytes(self.runs_dir) / 1e9
+        logger.info("[%s] free disk: %.1f GB", job_name, free_gb)
+        if free_gb < 2.0:
+            logger.warning("[%s] free disk is low (%.1f GB) -- consider clearing space", job_name, free_gb)
+
     def run(self) -> list[JobResult]:
+        lock = QueueLock(self.runs_dir / ".queue.lock")
+        if self.use_lock and not lock.acquire():
+            raise RuntimeError(
+                f"Another run-queue process already holds the lock at {lock.path}. "
+                "If you're sure none is actually running, delete that file."
+            )
+        try:
+            return self._run_locked()
+        finally:
+            if self.use_lock:
+                lock.release()
+
+    def _run_locked(self) -> list[JobResult]:
         results: list[JobResult] = []
         for tier_name, tier in self.queue.get("tiers", {}).items():
             for job in tier.get("jobs", []):
@@ -231,6 +274,9 @@ class QueueRunner:
                         JobResult(job["name"], tier_name, "dry_run", estimated_gpu_minutes=est)
                     )
                     continue
+
+                self._log_pre_job_resources(job["name"])
+                write_current_job(self.runs_dir, job["name"], tier_name, job["type"])
 
                 t0 = time.time()
                 try:

@@ -1,6 +1,6 @@
 run_name: ablation_distance_euclidean
 seed: 0
-device: cuda
+device: auto
 is_synthetic: false
 backbone:
   name: vit_tiny_patch16_224
@@ -31,12 +31,12 @@ loss:
   distance_metric: euclidean
 data:
   dataset: malimg
-  root: /kaggle/input/malimg-dataset
-  cache_dir: /kaggle/working/cache
+  root: data/malimg
+  cache_dir: data_cache/cache_malimg
   image_size: 224
   intermediate_size: 256
   batch_size: 64
-  num_workers: 2
+  num_workers: -1
   class_balanced_sampling: true
   augmentation:
     random_resized_crop_scale:
@@ -60,6 +60,7 @@ split:
   pseudo_unknown_family: null
   group_aware: true
   groups_file: configs/data/malimg_groups.yaml
+  fold_index: 0
 optim:
   lr: 0.0003
   weight_decay: 0.0001

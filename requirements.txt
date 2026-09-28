@@ -1,0 +1,18 @@
+# Core runtime dependencies, mirroring pyproject.toml's [project.dependencies].
+# Kept as a separate file (rather than only pyproject.toml) because
+# `pip download -r requirements.txt -d wheelhouse` is the documented way to
+# build an offline wheelhouse at home before carrying it to a workstation
+# with no internet -- see scripts/setup_env.py and HANDOFF.md.
+torch>=2.0
+torchvision
+timm>=1.0
+numpy
+scipy
+scikit-learn
+pandas
+pillow
+matplotlib
+pyyaml
+py7zr
+tqdm
+psutil

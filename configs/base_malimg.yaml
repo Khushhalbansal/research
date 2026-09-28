@@ -1,9 +1,12 @@
-# Tier-A main-result config: Malimg, real ViT backbone, for tomorrow's GPU run.
-# data.root MUST be overridden at runtime to the actual Kaggle input path
-# (e.g. `--override data.root=/kaggle/input/malimg-dataset`) -- see HANDOFF.md.
+# Tier-A main-result config: Malimg, real ViT backbone, for the college GPU
+# workstation. data.root defaults to the path scripts/fetch_data.py downloads
+# to; override with `--override data.root=...` if your data lives elsewhere
+# -- see HANDOFF.md. device: auto picks CUDA (least-loaded GPU if more than
+# one) when available, else falls back to CPU; num_workers: -1 auto-tunes to
+# the machine's CPU count (see utils/hardware.py).
 run_name: lrmc_malimg_main
 seed: 0
-device: cuda
+device: auto
 is_synthetic: false
 
 backbone:
@@ -35,12 +38,12 @@ loss:
 
 data:
   dataset: malimg
-  root: /kaggle/input/malimg-dataset
-  cache_dir: /kaggle/working/cache
+  root: data/malimg
+  cache_dir: data_cache/cache_malimg
   image_size: 224
   intermediate_size: 256
   batch_size: 64
-  num_workers: 2
+  num_workers: -1 # auto-tune to CPU count
   class_balanced_sampling: true
 
 split:
