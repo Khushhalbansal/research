@@ -1,0 +1,374 @@
+\documentclass[12pt,a4paper]{article}
+
+% =================================================
+% Packages
+% =================================================
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{ragged2e}
+\usepackage{geometry}
+\usepackage{xurl}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{enumitem}
+
+% =================================================
+% Page settings
+% =================================================
+
+\geometry{
+    a4paper,
+    margin=0.75in
+}
+
+\emergencystretch=2em
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+    pdftitle={Artificial Intelligence Based Zero-Day Malware Detection Using Contrastive Learning},
+    pdfauthor={Khushhal Kumar Bansal}
+}
+
+% =================================================
+% Table column definition
+% =================================================
+
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+% =================================================
+% Document
+% =================================================
+
+\begin{document}
+
+\title{
+    \textbf{Artificial Intelligence Based Zero-Day Malware Detection Using Contrastive Learning}
+}
+
+\author{
+    Khushhal Kumar Bansal\\
+    Department of Computer Science and Engineering
+}
+
+\date{September 2026}
+
+\maketitle
+
+% =================================================
+\section{Introduction}
+% =================================================
+
+The rapid expansion of software systems, cloud platforms, Internet of Things devices, and interconnected enterprise networks has significantly increased the attack surface available to cybercriminals. Malware remains one of the most persistent cybersecurity threats because malicious programs can be distributed rapidly and modified through packing, encryption, obfuscation, and polymorphic transformations. Among these threats, zero-day malware is particularly challenging because it is associated with previously unseen code patterns, unknown malware families, or attacks that exploit vulnerabilities before reliable signatures and detection rules become available.
+
+Conventional antivirus systems primarily depend on signatures, manually designed rules, and previously observed indicators of compromise. Although these approaches are effective against known threats, their detection capability decreases when a malicious file is modified or belongs to a family that was not included in the training database. Machine-learning-based detectors improve upon signature matching by learning statistical characteristics from executable files, assembly instructions, API calls, and behavioral traces. However, many existing systems are designed as closed-set classifiers. A closed-set classifier assumes that every test sample belongs to one of the classes observed during training. Consequently, an unknown malware sample may be incorrectly assigned to the closest known family with high confidence instead of being rejected as unfamiliar.
+
+This limitation motivates the formulation of zero-day malware detection as an open-set recognition problem. In an open-set setting, a model must classify samples from known malware families while identifying and rejecting samples that do not belong to any known family. OpenMax introduced a method for estimating whether a test sample belongs to an unknown class by calibrating the output of a deep neural network \citep{bendale2016}. Support Vector Data Description provides a classical approach for constructing a bounded decision region around a target distribution \citep{tax2004}. Deep one-class classification extends this idea by jointly learning a feature representation and a compact boundary around the target data \citep{ruff2018}.
+
+The reliability of an open-set detector depends strongly on the quality of its feature representation. If malware samples from different families overlap in the learned feature space, distance-based rejection becomes unreliable. Contrastive learning offers a suitable solution by explicitly learning relationships between examples. The objective pulls similar samples closer together and pushes dissimilar samples farther apart. Hadsell et al. introduced contrastive learning for learning invariant mappings \citep{hadsell2006}. FaceNet later demonstrated the use of metric learning for producing compact embeddings in which distances represent similarity \citep{schroff2015}. Supervised contrastive learning extended these principles by using multiple positive and negative examples within a training batch \citep{khosla2020}.
+
+Image-based malware analysis provides an effective way to apply deep-learning models to executable files. In this representation, the bytes of a malware binary are interpreted as numerical intensity values and arranged into a two-dimensional grayscale image. Different executable regions, including code, data, padding, resources, and encrypted sections, can generate distinguishable visual patterns. Nataraj et al. introduced malware visualization and showed that samples belonging to the same malware family can exhibit similar image texture and structure \citep{nataraj2011}. Kalash et al. later applied deep convolutional neural networks to malware images and evaluated malware-family classification using the Malimg and Microsoft malware datasets \citep{kalash2018}. Transfer-learning approaches have also been investigated for image-based malware classification \citep{bhodia2019}.
+
+This research considers two widely used malware benchmarks: the Microsoft Malware Classification Challenge dataset, commonly known as BIG 2015, and the Malimg dataset. BIG 2015 contains malware samples from nine families and provides byte and assembly representations \citep{microsoft2015}. The Malimg dataset contains thousands of grayscale malware images from 25 malware families \citep{nataraj2011}. These datasets can be used to construct a controlled zero-day protocol by excluding one or more malware families during training and introducing them only during testing.
+
+The proposed research develops a contrastive-learning-based open-set detector for malware images. A Vision Transformer is used to extract high-level representations from byte images. Vision Transformers divide an image into patches and use self-attention to model relationships between distant image regions \citep{dosovitskiy2020}. A projection head maps the backbone representation into a normalized embedding space. During training, samples from the same malware family are pulled together, while samples from different families are pushed apart using a supervised contrastive objective. For every known family, a class prototype and an acceptance radius are calculated. During inference, the input embedding is compared with all known-family prototypes. If the embedding lies outside the acceptable radius of every known class, the input is rejected as an unknown or potential zero-day malware sample.
+
+The main contributions of this research are:
+
+\begin{itemize}
+    \item Formulating zero-day malware detection as an open-set recognition problem.
+    \item Using supervised contrastive learning to produce separable malware-family embeddings.
+    \item Applying prototype-based classification and class-specific rejection radii.
+    \item Evaluating the proposed method on BIG 2015 and Malimg.
+    \item Comparing the proposed framework with conventional classification and anomaly-detection methods.
+\end{itemize}
+
+% =================================================
+\section{Related Work}
+% =================================================
+
+Research on zero-day malware detection covers several complementary areas, including static malware analysis, image-based classification, deep metric learning, open-set recognition, behavioral analysis, and network-based anomaly detection.
+
+\subsection{Traditional Malware Detection}
+
+Traditional malware detection commonly relies on signatures, hashes, manually engineered rules, and expert-defined indicators of compromise. Signature matching is efficient for previously observed malware, but it cannot identify a file for which no signature exists. Malware authors can evade signature matching by changing non-functional sections, packing the executable, encrypting sections, or generating polymorphic variants.
+
+Machine-learning methods address some of these limitations by learning statistical features from malware samples. Typical static features include opcode frequencies, imported functions, portable executable headers, strings, section information, byte n-grams, and control-flow characteristics. Rathore et al. investigated machine-learning and deep-learning models using opcode-frequency features and reported strong performance from Random Forest for their evaluated data \citep{rathore2018}. These methods are often computationally efficient and easier to interpret than large deep-learning systems. However, manually engineered features may not generalize when malware authors change the structure or representation of a binary.
+
+Vinayakumar et al. studied deep-learning approaches for intelligent malware detection using different representations of malware data \citep{vinayakumar2019}. Deep neural networks can automatically learn nonlinear patterns and reduce the need for manual feature engineering. Nevertheless, their performance may be strongly influenced by the training distribution. If all training and testing families overlap, a high score may reflect memorization of known families rather than genuine zero-day generalization.
+
+\subsection{Image-Based Malware Classification}
+
+Image-based malware analysis treats a binary file as a visual object. The byte sequence is interpreted as an array of unsigned integer values and arranged into a two-dimensional grayscale image. The resulting image may contain structural patterns related to executable sections, code regions, padding, resources, and encrypted data.
+
+Nataraj et al. proposed malware visualization and automatic classification using grayscale images and image-texture features \citep{nataraj2011}. Their work demonstrated that malware samples from the same family often exhibit similar visual layouts and textures. An important advantage of this approach is that it does not require disassembly or code execution. Consequently, malware can be represented before execution, reducing the risk associated with dynamic analysis.
+
+Kalash et al. applied deep convolutional neural networks to malware images and evaluated the approach on the Malimg and Microsoft malware datasets \citep{kalash2018}. CNNs can learn local texture patterns and hierarchical visual representations automatically. However, a CNN trained using a standard softmax output layer is generally a closed-set classifier. It will assign an input to one of the known classes even when the input belongs to an unseen family.
+
+Bhodia et al. investigated transfer learning for image-based malware classification using models pretrained on natural-image datasets \citep{bhodia2019}. Transfer learning can be useful when the malware dataset is relatively small. However, natural-image features are not always ideal for malware byte images, and the result may depend on the similarity between the source and target domains. In addition, strong closed-set classification performance does not prove that a model can reject zero-day malware.
+
+\subsection{Metric and Contrastive Learning}
+
+Metric learning attempts to learn a feature space in which distances correspond to semantic similarity. Hadsell et al. introduced a contrastive loss for learning an invariant mapping \citep{hadsell2006}. The method minimizes the distance between similar pairs and encourages dissimilar pairs to remain separated by a margin.
+
+FaceNet demonstrated the use of triplet loss to learn compact embeddings for face recognition and clustering \citep{schroff2015}. The central idea is to ensure that an anchor sample is closer to a positive sample than to a negative sample. This concept is directly applicable to malware families, where samples from the same family can be treated as positive examples and samples from different families can be treated as negative examples.
+
+Khosla et al. proposed supervised contrastive learning, which uses class labels to identify multiple positive examples for each anchor \citep{khosla2020}. Compared with ordinary cross-entropy training, supervised contrastive learning can produce more organized embedding spaces. These spaces are useful for prototype construction because samples from a class are encouraged to form compact clusters.
+
+For zero-day malware detection, contrastive learning offers two important benefits. First, it may improve generalization by learning relationships rather than relying only on class-specific output weights. Second, it provides a distance-based representation in which an unseen malware family can be detected as an embedding that is distant from all known-family prototypes.
+
+\subsection{Vision Transformers for Malware Images}
+
+Vision Transformers divide an image into fixed-size patches, convert the patches into token embeddings, and process them using self-attention. Dosovitskiy et al. demonstrated that Transformer-based image models can achieve strong performance when trained with sufficient data or appropriate pretraining \citep{dosovitskiy2020}.
+
+A Vision Transformer may be useful for malware images because informative patterns can occur in distant regions of a binary image. For example, a particular code region may interact with a resource or encrypted section located far away in the file. Self-attention can model relationships between these regions more directly than a purely local convolutional architecture.
+
+However, Vision Transformers are often data-hungry and may overfit small datasets. Therefore, the proposed research should include transfer learning, data augmentation, regularization, and comparisons with CNN baselines. The Transformer backbone should be evaluated not only using closed-set accuracy but also using unknown-sample rejection metrics.
+
+\subsection{Open-Set Recognition}
+
+Open-set recognition addresses the situation in which unknown classes appear during testing. Bendale and Boult proposed OpenMax, which modifies the final classification process to estimate the probability that an input does not belong to any known class \citep{bendale2016}. OpenMax is important because it demonstrates that standard softmax classification can be adapted for unknown detection.
+
+Ge et al. proposed Generative OpenMax, which uses generative adversarial networks to produce samples that represent unknown categories \citep{ge2017}. The generated samples are used to improve the separation between known classes and the unknown region. Although this approach can strengthen open-set recognition, the quality of the generated unknown samples is critical. Synthetic unknowns may not accurately represent real zero-day malware.
+
+Shu et al. proposed Deep Open Classification for identifying text documents that do not belong to the known training classes \citep{shu2017}. Their work is not malware-specific, but its one-versus-rest rejection concept is relevant to open-world classification. It illustrates the importance of modeling unknown inputs explicitly rather than treating all test data as members of known categories.
+
+\subsection{One-Class and Boundary-Based Methods}
+
+Support Vector Data Description constructs a hyperspherical boundary around a target data distribution and classifies points outside the boundary as novel or anomalous \citep{tax2004}. This approach is useful when reliable examples of every possible unknown class are unavailable, which is common in zero-day detection.
+
+Deep SVDD extends one-class learning by using a neural network to map data into a space where normal or target samples are close to a center \citep{ruff2018}. The method jointly learns the representation and the decision boundary. Its limitation is that the learned representation may collapse without appropriate constraints, initialization, and regularization.
+
+The proposed prototype-radius approach is related to one-class boundary methods but differs in an important way. Instead of learning only one global boundary, it learns a separate prototype and radius for each known malware family. This allows the model to represent different levels of intra-family variation. A compact malware family can receive a smaller radius, while a diverse family can receive a larger radius.
+
+\subsection{Margin-Based Open-Set Learning}
+
+Margin-based methods improve class separation by explicitly controlling distances or angular relationships in the embedding space. Che et al. proposed a multi-relation margin loss for few-shot open-set recognition \citep{che2023}. Their approach models relationships between samples and class representations and is designed to improve the separation between known and unknown data.
+
+Ma et al. proposed a normalized maximal-margin loss for open-set image classification \citep{ma2021}. The method minimizes intra-class variation and increases inter-class separation using a normalized margin objective. These ideas are useful for malware detection because class-specific margins can reduce overlap among known families and create more space for unknown samples.
+
+The proposed model adapts this principle through learnable rejection radii. During training, the model is encouraged to keep known samples inside their family boundaries while preventing the radii from becoming unnecessarily large. The resulting boundaries are then used during inference to reject samples that are distant from all known prototypes.
+
+\subsection{Behavioral Malware Detection}
+
+Static byte analysis can be efficient, but it may fail when a malware sample is heavily obfuscated or packed. Behavioral analysis addresses this limitation by observing what a program does during execution. Common behavioral features include API-call sequences, registry modifications, process creation, file-system changes, memory operations, and network connections.
+
+Nizami et al. proposed a hybrid zero-day malware-detection framework that combines contrastive learning with behavioral analysis and multiple monitoring stages \citep{nizami2024}. The advantage of a hybrid approach is that static and behavioral representations can complement one another. The disadvantage is that dynamic execution requires sandbox infrastructure and may be affected by malware that detects the analysis environment.
+
+Carter et al. proposed contrastBERT for behavioral anomaly detection using Transformer-based modeling and contrastive learning \citep{carter2025}. Sequence models can capture temporal dependencies that are not available in a single static image. However, collecting high-quality behavioral data is more expensive, and dynamic analysis can increase inference time.
+
+\subsection{Network and IoT Zero-Day Detection}
+
+Contrastive learning has also been applied to zero-day network intrusion detection. Wilkie et al. proposed a contrastive-loss framework that models network traffic distributions and improves the separation of known and unknown attacks \citep{wilkie2026}. This work is relevant because network traffic, like malware binaries, can experience distribution shift and class imbalance.
+
+Ridwan investigated self-supervised feature learning for zero-day malware detection in IoT-centric environments \citep{ridwan2026}. Self-supervised learning is attractive in IoT security because labeled attack data may be limited and devices may have restricted computational resources. However, IoT-specific protocols and device behavior may not transfer directly to Windows executable malware.
+
+\subsection{Datasets and Evaluation Problems}
+
+The choice of dataset and evaluation protocol has a major effect on the reported performance of malware detectors. BIG 2015 provides byte and assembly representations from nine malware families \citep{microsoft2015}. Malimg provides grayscale malware images from 25 families \citep{nataraj2011}. Both datasets are useful benchmarks, but they may not fully represent current malware behavior or modern evasion techniques.
+
+A common evaluation problem is random sample splitting. If samples from every malware family appear in both training and testing, the experiment mainly measures interpolation among known families. It does not measure zero-day detection. A stronger protocol holds out complete malware families during training and evaluates them only during testing. This family-level split is used in the proposed research.
+
+Another issue is dataset duplication and family similarity. Closely related samples may occur across different subsets, causing information leakage. Therefore, duplicate detection, family-level separation, temporal separation where possible, and detailed reporting of class distributions are necessary for a reliable evaluation.
+
+\subsection{Research Gap}
+
+The literature demonstrates progress in malware visualization, deep learning, contrastive representation learning, and open-set recognition. However, several gaps remain. Many image-based malware studies focus on closed-set accuracy and do not explicitly test unseen-family rejection. Open-set methods such as OpenMax and Deep SVDD are not always evaluated on malware-image benchmarks. Behavioral contrastive methods capture useful temporal information but require dynamic execution. Finally, the combination of supervised contrastive learning, class prototypes, and learnable family-specific rejection radii remains insufficiently explored.
+
+This research addresses these gaps by developing a static image-based open-set detector. The proposed framework learns malware-family embeddings using supervised contrastive learning, calculates prototypes for known families, and learns class-specific acceptance radii. During inference, a sample is assigned to a known family only when its embedding falls within the corresponding radius. Otherwise, it is rejected as unknown or potential zero-day malware.
+
+% =================================================
+\clearpage
+\section{Research Comparison Table}
+% =================================================
+
+\small
+
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.18}
+
+\begin{longtable}{
+P{2.2cm}
+P{2.7cm}
+P{2.7cm}
+P{2.8cm}
+P{2.7cm}
+P{4.0cm}
+}
+
+\caption{Comparison of Previous Research Relevant to Zero-Day Malware Detection}
+\label{tab:research-comparison}\\
+
+\toprule
+\textbf{Authors and Year} &
+\textbf{Techniques Used} &
+\textbf{Preprocessing} &
+\textbf{Architecture or Method} &
+\textbf{Dataset and Performance} &
+\textbf{Advantages and Disadvantages} \\
+
+\midrule
+\endfirsthead
+
+\toprule
+\textbf{Authors and Year} &
+\textbf{Techniques Used} &
+\textbf{Preprocessing} &
+\textbf{Architecture or Method} &
+\textbf{Dataset and Performance} &
+\textbf{Advantages and Disadvantages} \\
+
+\midrule
+\endhead
+
+\bottomrule
+\endfoot
+
+Nizami et al. (2024) \citep{nizami2024} &
+Hybrid contrastive and behavioral learning &
+Byte images; API, registry, and network logs &
+Multi-stage static and behavioral pipeline &
+Windows malware and BIG 2015-related data; reports improved zero-day detection &
+Combines static and behavioral evidence. High computational cost and possible sandbox-evasion problems. \\
+
+Vinayakumar et al. (2019) \citep{vinayakumar2019} &
+Deep learning and malware visualization &
+Executable files converted into grayscale images; static and dynamic features &
+Hybrid CNN and deep-learning detector &
+Public and private malware datasets; improves over classical machine-learning baselines &
+Learns complex features automatically. Requires large data and GPU resources. \\
+
+Shu, Xu, and Liu (2017) \citep{shu2017} &
+Deep Open Classification &
+Tokenization and feature embedding &
+CNN with open-class rejection &
+AG's News, DBPedia, and Yahoo Answers; improves unknown-class rejection &
+Provides a general open-set formulation. Originally designed for text rather than malware. \\
+
+Tax and Duin (2004) \citep{tax2004} &
+Support Vector Data Description &
+Feature-vector extraction &
+One-class SVM with a hypersphere boundary &
+Synthetic and UCI datasets; effective for low-dimensional outlier detection &
+Works with limited labeled data. Sensitive to kernel selection and feature scaling. \\
+
+Schroff et al. (2015) \citep{schroff2015} &
+Triplet-loss metric learning &
+Image alignment and normalization &
+CNN producing compact embeddings &
+LFW face-recognition benchmark; strong face-verification performance &
+Foundation for metric learning. Requires careful triplet mining and is not malware-specific. \\
+
+Khosla et al. (2020) \citep{khosla2020} &
+Supervised contrastive learning &
+Image augmentation and normalization &
+ResNet with temperature-scaled contrastive loss &
+CIFAR-10, CIFAR-100, and ImageNet; improves over cross-entropy &
+Produces robust and separable embeddings. Requires labeled training batches. \\
+
+Rathore et al. (2018) \citep{rathore2018} &
+Machine learning and deep learning &
+Opcode frequencies and PE features &
+Random Forest, DNN, and autoencoder models &
+Custom malware dataset; strong known-class precision and recall &
+Uses interpretable static features. Weak generalization to unseen families. \\
+
+Kalash et al. (2018) \citep{kalash2018} &
+Image-based CNN classification &
+Binary bytes converted into grayscale images &
+CNN malware-family classifier &
+Malimg and Microsoft datasets; high closed-set accuracy &
+Demonstrates effective malware visualization. Does not explicitly reject unknown families. \\
+
+Dosovitskiy et al. (2020/2021) \citep{dosovitskiy2020} &
+Vision Transformer &
+Images divided into fixed-size patches &
+Transformer with global self-attention &
+ImageNet and JFT-300M; competitive with CNNs &
+Models long-range image relationships. Data-hungry on small datasets. \\
+
+Bendale and Boult (2016) \citep{bendale2016} &
+Open-set recognition &
+Deep features and activation calibration &
+Softmax replacement using OpenMax &
+ImageNet and MNIST; improves unknown detection &
+Explicitly models unknown probability. Depends on known-class distribution assumptions. \\
+
+Ruff et al. (2018) \citep{ruff2018} &
+Deep one-class classification &
+Feature normalization and one-class sampling &
+Deep SVDD hypersphere &
+MNIST and CIFAR-10; outperforms shallow one-class methods &
+Learns features and boundary jointly. Sensitive to initialization and representation collapse. \\
+
+Ge et al. (2017) \citep{ge2017} &
+Generative OpenMax &
+GAN-generated unknown samples &
+CNN, GAN, and OpenMax &
+MNIST and EMNIST; improves open-set recognition &
+Models unknown-like samples. GAN training can be unstable. \\
+
+Che, An, and Xue (2023) \citep{che2023} &
+Multi-relation margin loss &
+Few-shot episodic sampling &
+Few-shot classifier with margin learning &
+miniImageNet and CUB; improves few-shot open-set recognition &
+Strengthens class boundaries. Not originally evaluated on malware. \\
+
+Ma et al. (2021) \citep{ma2021} &
+Normalized maximal-margin loss &
+Image normalization and augmentation &
+Deep classifier with margin objective &
+CIFAR-10, CIFAR-100, and ImageNet-O; improves known/unknown separation &
+Requires no additional network. May be affected by class imbalance. \\
+
+Carter et al. (2025) \citep{carter2025} &
+Contrastive behavioral anomaly detection &
+API sequences converted into tokens &
+Transformer behavioral encoder &
+Windows behavioral logs; detects anomalous execution &
+Captures temporal behavior. Requires dynamic execution infrastructure. \\
+
+Wilkie et al. (2026) \citep{wilkie2026} &
+Contrastive zero-day intrusion detection &
+Network-flow features and normalization &
+Distribution-aware embedding network &
+Network intrusion datasets; reports improved zero-day AUROC &
+Handles imbalance and unknown attacks. Focused on network traffic rather than file malware. \\
+
+Ridwan (2026) \citep{ridwan2026} &
+Self-supervised IoT malware learning &
+IoT traffic and byte sequences &
+Siamese or contrastive network &
+Custom IoT datasets; evaluates zero-day detection on constrained devices &
+Lightweight and edge-deployable. Limited protocol coverage. \\
+
+Hadsell, Chopra, and LeCun (2006) \citep{hadsell2006} &
+Foundational contrastive learning &
+Paired samples and normalization &
+Neural network with contrastive loss &
+Face and invariant-feature experiments; foundation for metric learning &
+Conceptually simple and foundational. Less expressive than modern deep architectures. \\
+
+\end{longtable}
+
+% =================================================
+% References
+% =================================================
+
+\clearpage
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}  

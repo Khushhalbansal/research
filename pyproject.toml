@@ -1,0 +1,49 @@
+[project]
+name = "lrmc"
+version = "0.1.0"
+description = "Learnable-Radius Margin-Contrastive open-set zero-day malware detection"
+requires-python = ">=3.10"
+readme = "README.md"
+dependencies = [
+    "torch>=2.0",
+    "torchvision",
+    "timm>=1.0",
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "pandas",
+    "pillow",
+    "matplotlib",
+    "pyyaml",
+    "py7zr",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "black"]
+
+[project.scripts]
+lrmc = "lrmc.cli.main:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
