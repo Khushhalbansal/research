@@ -193,7 +193,7 @@ class Trainer:
         n_batches = 0
         for i, (v1, v2, labels) in enumerate(self.train_loader):
             labels = labels.to(self.device)
-            with torch.autocast(device_type=self.device.type, enabled=use_amp):
+            with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=use_amp):
                 features = self._forward_features(v1, v2)
                 prototypes_tensor = self.prototypes.get()
                 radii_tensor = self.radii.radii

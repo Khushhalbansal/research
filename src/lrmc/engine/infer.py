@@ -100,7 +100,7 @@ class FrozenInferenceEngine:
 
     def __init__(self, cfg: Config, checkpoint_path: str | Path):
         self.cfg = cfg
-        ckpt = load_checkpoint(checkpoint_path, map_location=cfg.device)
+        ckpt = load_checkpoint(checkpoint_path, map_location="cpu")
         self.label_map: dict[str, int] = ckpt["label_map"]
         self.families = [f for f, _ in sorted(self.label_map.items(), key=lambda kv: kv[1])]
 
