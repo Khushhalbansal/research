@@ -77,6 +77,10 @@ class MalimgLoader:
             for img_path in images:
                 result = self._pre.load_image_array(img_path)
                 sample_id = f"{family}/{img_path.name}"
+                if sample_id in self._path_by_id:
+                    # Same family folder name under several pre-split dirs
+                    # (train/val/test mirrors): keep ids unique via the path.
+                    sample_id = img_path.relative_to(self.root).as_posix()
                 rec = SampleRecord(
                     sample_id=sample_id, family=family, sha256=result.sha256, path=str(img_path)
                 )
@@ -84,7 +88,7 @@ class MalimgLoader:
                 self._path_by_id[sample_id] = img_path
                 hash_to_ids.setdefault(result.sha256, []).append(sample_id)
                 count += 1
-            family_counts[family] = count
+            family_counts[family] = family_counts.get(family, 0) + count
 
         n_dup_hashes = sum(1 for ids in hash_to_ids.values() if len(ids) > 1)
         n_dup_files = sum(len(ids) - 1 for ids in hash_to_ids.values() if len(ids) > 1)
