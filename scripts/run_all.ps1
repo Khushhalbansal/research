@@ -11,7 +11,8 @@ param(
     [int]$Seeds = 5,
     [string]$TorchIndex = "https://download.pytorch.org/whl/cu128"
 )
-$ErrorActionPreference = "Stop"
+# Continue (not Stop): PS 5.1 turns any native-command stderr (pip warnings, import errors) into a terminating error under Stop. Failures are caught via Check.
+$ErrorActionPreference = "Continue"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
 function Step($m) { Write-Host "`n=== $m ===" -ForegroundColor Cyan }
@@ -31,7 +32,7 @@ $vpy = ".venv\Scripts\python.exe"
 & $vpy -m pip install --upgrade pip; Check "pip upgrade"
 
 Step "3/8 Install CUDA PyTorch (a plain 'pip install torch' on Windows gives a CPU-only build)"
-$hasCuda = & $vpy -c "import torch; print(torch.cuda.is_available())" 2>$null
+$hasCuda = (& cmd /c ".venv\Scripts\python.exe -c `"import torch; print(torch.cuda.is_available())`" 2>nul") | Select-Object -Last 1
 if ($hasCuda -ne "True") {
     & $vpy -m pip install torch torchvision --index-url $TorchIndex
     if ($LASTEXITCODE -ne 0) {
