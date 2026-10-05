@@ -47,7 +47,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 # is the most commonly used one as of writing -- override with --slug if it
 # has moved or you prefer a different mirror.
 DEFAULT_MALIMG_SLUG = "manmandes/malimg"
-DEFAULT_BIG2015_SLUG = "c:microsoft-malware-classification-challenge"
+DEFAULT_BIG2015_SLUG = "malware-classification"
 
 DISK_SAFETY_MULTIPLIER = 2.5  # zip + extracted + working headroom
 
