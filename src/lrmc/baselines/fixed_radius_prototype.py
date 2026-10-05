@@ -31,7 +31,8 @@ class FixedRadiusPrototypeBaseline(PerClassStatBaseline):
             m = m / np.linalg.norm(m)
             prototypes[c] = m
             d = 1.0 - z[mask] @ m
-            radii[c] = np.quantile(d, self.quantile)
+            # Near-duplicate classes give a ~0 quantile; floor it so d / r stays finite.
+            radii[c] = max(float(np.quantile(d, self.quantile)), 1e-6)
         self.prototypes = prototypes
         self.radii = radii
 
