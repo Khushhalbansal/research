@@ -52,7 +52,7 @@ if (-not $SkipData) {
     $kj = Join-Path $env:USERPROFILE ".kaggle\kaggle.json"
     $have = (Test-Path data\malimg) -and (Test-Path data\big2015)
     if (-not $have) {
-        $tok = Join-Path $env:USERPROFILE ".kaggleccess_token"
+        $tok = Join-Path $env:USERPROFILE ".kaggle\access_token"
         if (-not ((Test-Path $kj) -or (Test-Path $tok) -or $env:KAGGLE_API_TOKEN)) {
             throw "No data and no Kaggle credentials ($kj, $tok, or KAGGLE_API_TOKEN). Either copy datasets into data\malimg and data\big2015, or download kaggle.json (Kaggle > Settings > API) into %USERPROFILE%\.kaggle\ and re-run."
         }
