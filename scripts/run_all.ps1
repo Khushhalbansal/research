@@ -43,7 +43,7 @@ if ($hasCuda -ne "True") {
 & $vpy -c "import torch; assert torch.cuda.is_available(), 'torch cannot see the GPU'; print(torch.__version__, torch.cuda.get_device_name(0))"; Check "CUDA check"
 
 Step "4/8 Install project dependencies + tests"
-& $vpy scripts\setup_env.py --no-venv --dev; Check "setup_env"
+& $vpy scripts\setup_env.py --dev; Check "setup_env"
 & $vpy -m pip install kaggle; Check "kaggle install"
 & $vpy -m pytest -q; Check "pytest"
 
