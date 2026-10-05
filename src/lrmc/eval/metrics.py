@@ -125,7 +125,7 @@ def oscr_curve(
     order = np.argsort(fprs)
     fprs_sorted = np.array(fprs)[order]
     ccrs_sorted = np.array(ccrs)[order]
-    trapezoid = getattr(np, "trapezoid", np.trapz)
+    trapezoid = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
     auc = float(trapezoid(ccrs_sorted, fprs_sorted))
     return {"fpr": fprs_sorted.tolist(), "ccr": ccrs_sorted.tolist(), "oscr_auc": auc}
 
