@@ -8,6 +8,7 @@
 #   ... -Seeds 3       # fewer seeds than the default 5
 param(
     [switch]$SkipData,
+    [switch]$MalimgOnly,   # skip BIG2015 entirely (data + jobs)
     [int]$Seeds = 5,
     [string]$TorchIndex = "https://download.pytorch.org/whl/cu128"
 )
@@ -48,19 +49,19 @@ Step "4/8 Install project dependencies + tests"
 & $vpy -m pytest -q; Check "pytest"
 
 Step "5/8 Data"
-if (-not $SkipData) {
+$datasets = if ($MalimgOnly) { @("malimg") } else { @("malimg", "big2015") }
+foreach ($d in $datasets) {
+    & $vpy -m lrmc verify-data --dataset $d --root data\$d *> $null
+    if ($LASTEXITCODE -eq 0) { Write-Host "$d already present and verified."; continue }
+    if ($SkipData) { throw "$d missing/invalid under data\$d and -SkipData was given." }
     $kj = Join-Path $env:USERPROFILE ".kaggle\kaggle.json"
-    $have = (Test-Path data\malimg) -and (Test-Path data\big2015)
-    if (-not $have) {
-        $tok = Join-Path $env:USERPROFILE ".kaggle\access_token"
-        if (-not ((Test-Path $kj) -or (Test-Path $tok) -or $env:KAGGLE_API_TOKEN)) {
-            throw "No data and no Kaggle credentials ($kj, $tok, or KAGGLE_API_TOKEN). Either copy datasets into data\malimg and data\big2015, or download kaggle.json (Kaggle > Settings > API) into %USERPROFILE%\.kaggle\ and re-run."
-        }
-        & $vpy scripts\fetch_data.py --dataset both; Check "fetch_data"
+    $tok = Join-Path $env:USERPROFILE ".kaggle\access_token"
+    if (-not ((Test-Path $kj) -or (Test-Path $tok) -or $env:KAGGLE_API_TOKEN)) {
+        throw "No $d data and no Kaggle credentials ($kj, $tok, or KAGGLE_API_TOKEN)."
     }
+    & $vpy scripts\fetch_data.py --dataset $d; Check "fetch $d"
+    & $vpy -m lrmc verify-data --dataset $d --root data\$d; Check "verify $d"
 }
-& $vpy -m lrmc verify-data --dataset malimg --root data\malimg; Check "verify malimg"
-& $vpy -m lrmc verify-data --dataset big2015 --root data\big2015; Check "verify big2015"
 
 Step "6/8 Benchmark real GPU"
 & $vpy -m lrmc benchmark --device auto --seeds $Seeds; Check "benchmark"
@@ -69,7 +70,12 @@ Step "7/8 Smoke test"
 & $vpy -m lrmc train configs\rehearsal_mock_malimg.yaml; Check "smoke train"
 & $vpy -m lrmc evaluate configs\rehearsal_mock_malimg.yaml; Check "smoke evaluate"
 
-Step "8/8 Launch full queue (detached, survives AnyDesk disconnect)"
-powershell -ExecutionPolicy Bypass -File scripts\run_detached.ps1 -Queue experiments/queue.yaml
+Step "8/8 Launch queue (detached, survives AnyDesk disconnect)"
+$queue = "experiments/queue.yaml"
+if ($MalimgOnly) {
+    $queue = "experiments/queue_malimg.yaml"
+    & $vpy scripts\filter_queue.py experiments\queue.yaml experiments\queue_malimg.yaml; Check "filter queue"
+}
+powershell -ExecutionPolicy Bypass -File scripts\run_detached.ps1 -Queue $queue
 Write-Host "`nRunning. Check progress:  .venv\Scripts\python.exe -m lrmc status"
 Write-Host "When finished:           .venv\Scripts\python.exe -m lrmc aggregate"
