@@ -70,7 +70,7 @@ class OpenMaxBaseline(BaselineDetector):
                 preds = logits.argmax(dim=1)
                 for i in range(images.shape[0]):
                     if int(preds[i]) == int(labels[i]):
-                        feats_by_class[int(labels[i])].append(feat[i].numpy())
+                        feats_by_class[int(labels[i])].append(feat[i].detach().cpu().numpy())
 
         dim = self.net.backbone.feature_dim
         mavs = np.zeros((num_classes, dim))
@@ -97,7 +97,7 @@ class OpenMaxBaseline(BaselineDetector):
         if x.dim() == 3:
             x = x.unsqueeze(0)
         logits, feat = self.net(x.to(self.device))
-        return logits[0].numpy(), feat[0].numpy()
+        return logits[0].detach().cpu().numpy(), feat[0].detach().cpu().numpy()
 
     def _openmax_probs(self, x: torch.Tensor) -> np.ndarray:
         logits, feat = self._forward(x)

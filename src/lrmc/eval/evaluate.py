@@ -26,6 +26,7 @@ from lrmc.eval.metrics import (
     unknown_detection_rate,
 )
 from lrmc.utils.env_info import env_snapshot
+from lrmc.utils.hardware import resolve_device
 
 
 def _predict_all(
@@ -38,7 +39,7 @@ def _predict_all(
         arr, is_image = loader.get_array(sid)
         image = image_gen.eval_view(arr, is_pre_rendered_image=is_image)
         out = engine.predict(image)
-        z = engine.embed(image).squeeze(0).numpy()
+        z = engine.embed(image).squeeze(0).detach().cpu().numpy()
         outputs.append((sid, family_by_id[sid], out))
         embeddings.append(z)
     return outputs, np.stack(embeddings) if embeddings else np.zeros((0, 1))
@@ -73,7 +74,7 @@ def run_evaluation(
     unknown_zd = np.array([1 if out.verdict == "ZERO_DAY" else 0 for _, _, out in unknown_outputs])
 
     dummy_batch = torch.rand(1, 1, cfg.data.image_size, cfg.data.image_size)
-    eff = efficiency_report(engine.network, dummy_batch, torch.device(cfg.device))
+    eff = efficiency_report(engine.network, dummy_batch, resolve_device(cfg.device))
 
     if save_arrays_path is not None:
         Path(save_arrays_path).parent.mkdir(parents=True, exist_ok=True)
@@ -87,8 +88,8 @@ def run_evaluation(
             unknown_pred=np.array(unknown_pred),
             unknown_scores=unknown_scores,
             unknown_embeddings=unknown_embeddings,
-            prototypes=engine.distance_calc.prototypes.numpy(),
-            radii=engine.classifier.radii.numpy(),
+            prototypes=engine.distance_calc.prototypes.detach().cpu().numpy(),
+            radii=engine.classifier.radii.detach().cpu().numpy(),
         )
 
     return _assemble_metrics(
@@ -228,7 +229,7 @@ def run_baseline_evaluation(
         or getattr(baseline, "net", None)
         or getattr(baseline, "backbone", None)
     )
-    eff = efficiency_report(encoder, dummy, torch.device(cfg.device)) if encoder is not None else {}
+    eff = efficiency_report(encoder, dummy, resolve_device(cfg.device)) if encoder is not None else {}
 
     if save_arrays_path is not None:
         Path(save_arrays_path).parent.mkdir(parents=True, exist_ok=True)

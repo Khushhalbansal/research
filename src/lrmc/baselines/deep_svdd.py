@@ -80,8 +80,8 @@ class DeepSVDDBaseline(BaselineDetector):
             for images, labels, _ids in train_loader:
                 all_z2.append(self._forward(images.to(self.device)))
                 all_y2.append(labels)
-            z_final = torch.cat(all_z2).numpy()
-            y_final = torch.cat(all_y2).numpy()
+            z_final = torch.cat(all_z2).detach().cpu().numpy()
+            y_final = torch.cat(all_y2).detach().cpu().numpy()
         num_classes = len(self.families)
         centroids = np.zeros((num_classes, z_final.shape[1]))
         for c in range(num_classes):
@@ -96,7 +96,7 @@ class DeepSVDDBaseline(BaselineDetector):
             x = x.unsqueeze(0)
         z = self._forward(x.to(self.device))[0]
         d = ((z - self.center) ** 2).sum().item()
-        return d, z.numpy()
+        return d, z.detach().cpu().numpy()
 
     def score(self, x: torch.Tensor) -> float:
         d, _z = self._distance(x)

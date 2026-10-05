@@ -41,7 +41,7 @@ class KNNBaseline(EmbeddingBaseline):
 
     def calibrate(self, val_loader, target_known_tpr: float = 0.95) -> None:
         z, _y = self._embed_loader(val_loader)
-        scores = np.array([self._score_embedding(zi) for zi in z.numpy()])
+        scores = np.array([self._score_embedding(zi) for zi in z.detach().cpu().numpy()])
         self.kappa = float(np.quantile(scores, target_known_tpr))
 
     def nearest_family(self, x) -> str:

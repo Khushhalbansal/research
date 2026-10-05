@@ -56,6 +56,7 @@ class EmbeddingBaseline(BaselineDetector):
 
     def __init__(self, encoder: nn.Module, label_map: dict[str, int]):
         self.encoder = encoder
+        self._enc_device = next(encoder.parameters()).device
         self.encoder.eval()
         for p in self.encoder.parameters():
             p.requires_grad_(False)
@@ -66,7 +67,7 @@ class EmbeddingBaseline(BaselineDetector):
     def _embed_loader(self, loader) -> tuple[torch.Tensor, torch.Tensor]:
         zs, ys = [], []
         for images, labels, _ids in loader:
-            zs.append(self.encoder(images))
+            zs.append(self.encoder(images.to(self._enc_device)))
             ys.append(labels)
         return torch.cat(zs), torch.cat(ys)
 
@@ -74,11 +75,11 @@ class EmbeddingBaseline(BaselineDetector):
     def _embed_one(self, x: torch.Tensor) -> np.ndarray:
         if x.dim() == 3:
             x = x.unsqueeze(0)
-        return self.encoder(x).squeeze(0).numpy()
+        return self.encoder(x.to(self._enc_device)).squeeze(0).detach().cpu().numpy()
 
     def fit(self, train_loader) -> None:
         z, y = self._embed_loader(train_loader)
-        self._fit_embeddings(z.numpy(), y.numpy())
+        self._fit_embeddings(z.detach().cpu().numpy(), y.detach().cpu().numpy())
 
     def score(self, x: torch.Tensor) -> float:
         return self._score_embedding(self._embed_one(x))
@@ -115,7 +116,7 @@ class PerClassStatBaseline(EmbeddingBaseline):
 
     def calibrate(self, val_loader, target_known_tpr: float = 0.95) -> None:
         z, _y = self._embed_loader(val_loader)
-        scores = np.array([self._score_embedding(zi) for zi in z.numpy()])
+        scores = np.array([self._score_embedding(zi) for zi in z.detach().cpu().numpy()])
         self.kappa = float(np.quantile(scores, target_known_tpr))
 
     def nearest_family(self, x: torch.Tensor) -> str:
