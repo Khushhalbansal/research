@@ -61,6 +61,15 @@ def run_evaluation(
     image_gen = ImageGenerator(image_size=cfg.data.image_size)
     families = engine.families
 
+    # Calibrate the accept/reject threshold on KNOWN validation samples only
+    # (same 95%-known-acceptance rule the baselines use) instead of the fixed
+    # default kappa=1.0, which accepts nearly everything once radii grow.
+    kappa = engine.classifier.kappa
+    if getattr(fold, "val_known", None):
+        val_outputs, _ = _predict_all(engine, loader, fold.val_known, image_gen)
+        kappa = float(np.quantile([out.score for _, _, out in val_outputs], 0.95))
+        engine.classifier.kappa = kappa
+
     known_outputs, known_embeddings = _predict_all(engine, loader, fold.test_known, image_gen)
     unknown_outputs, unknown_embeddings = _predict_all(engine, loader, fold.test_unknown, image_gen)
 
@@ -107,6 +116,7 @@ def run_evaluation(
         model_hash=engine.model_hash,
         pretrained_source=engine.network.pretrained_source,
         start_time=start,
+        extra={"kappa_calibrated": kappa},
     )
 
 
