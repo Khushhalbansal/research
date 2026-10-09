@@ -40,8 +40,8 @@ data:
   cache_dir: data_cache/cache_big2015
   image_size: 224
   intermediate_size: 256
-  batch_size: 64
-  num_workers: -1 # auto-tune to CPU count
+  batch_size: 128
+  num_workers: 4
   class_balanced_sampling: true
 
 split:
